@@ -1,12 +1,13 @@
 'use client'
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
+import { supabase } from '@/lib/supabase'
 
 type Session = {
   id: string
   name: string
   date: string
   time: string
-  zoomLink: string
+  zoom_link: string
   students: string[]
   status: 'scheduled' | 'live' | 'complete'
 }
@@ -17,12 +18,72 @@ type FormTemplate = {
   fields: string[]
 }
 
+type Supervisor = {
+  id: string
+  email: string
+  full_name: string
+}
+
 export default function Home() {
   const [page, setPage] = useState('dashboard')
   const [sessions, setSessions] = useState<Session[]>([])
   const [forms, setForms] = useState<FormTemplate[]>([])
   const [showNewSession, setShowNewSession] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
+  const [supervisor, setSupervisor] = useState<Supervisor | null>(null)
+  const [loading, setLoading] = useState(true)
+
+  useEffect(() => {
+    checkUser()
+  }, [])
+
+  const checkUser = async () => {
+    const { data: { session } } = await supabase.auth.getSession()
+    if (!session) {
+      window.location.href = '/auth'
+      return
+    }
+    const { data: supervisorData } = await supabase
+      .from('supervisors')
+      .select('*')
+      .eq('id', session.user.id)
+      .single()
+    setSupervisor(supervisorData)
+    loadSessions(session.user.id)
+    loadForms(session.user.id)
+    setLoading(false)
+  }
+
+  const loadSessions = async (userId: string) => {
+    const { data } = await supabase
+      .from('sessions')
+      .select('*')
+      .eq('supervisor_id', userId)
+      .order('created_at', { ascending: false })
+    if (data) setSessions(data)
+  }
+
+  const loadForms = async (userId: string) => {
+    const { data } = await supabase
+      .from('form_templates')
+      .select('*')
+      .eq('supervisor_id', userId)
+      .order('created_at', { ascending: false })
+    if (data) setForms(data)
+  }
+
+  const handleSignOut = async () => {
+    await supabase.auth.signOut()
+    window.location.href = '/auth'
+  }
+
+  if (loading) {
+    return (
+      <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#F9F7F4', fontFamily:'system-ui'}}>
+        <div style={{color:'#A8A29E', fontSize:'14px'}}>Loading...</div>
+      </div>
+    )
+  }
 
   return (
     <div style={{display:'flex', minHeight:'100vh', fontFamily:'system-ui, sans-serif', background:'#F9F7F4'}}>
@@ -46,28 +107,36 @@ export default function Home() {
         </nav>
         <div style={{padding:'14px 10px', borderTop:'1px solid rgba(0,0,0,0.07)'}}>
           <div style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px'}}>
-            <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'#EBF3EE', color:'#3B6D54', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:'500'}}>DR</div>
+            <div style={{width:'32px', height:'32px', borderRadius:'50%', background:'#EBF3EE', color:'#3B6D54', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:'500'}}>
+              {supervisor?.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'S'}
+            </div>
             <div>
-              <div style={{fontSize:'13px', fontWeight:'500'}}>Dr. Reeves</div>
-              <div style={{fontSize:'11px', color:'#A8A29E'}}>Clinical supervisor</div>
+              <div style={{fontSize:'13px', fontWeight:'500'}}>{supervisor?.full_name || 'Supervisor'}</div>
+              <div style={{fontSize:'11px', color:'#A8A29E', cursor:'pointer'}} onClick={handleSignOut}>Sign out</div>
             </div>
           </div>
         </div>
       </aside>
 
       <main style={{marginLeft:'220px', flex:1, padding:'28px 32px'}}>
-        {page === 'dashboard' && <Dashboard sessions={sessions} setPage={setPage} onNewSession={() => setShowNewSession(true)} />}
+        {page === 'dashboard' && <Dashboard sessions={sessions} setPage={setPage} onNewSession={() => setShowNewSession(true)} supervisor={supervisor} />}
         {page === 'sessions' && <Sessions sessions={sessions} setPage={setPage} onNewSession={() => setShowNewSession(true)} />}
         {page === 'reports' && <Reports sessions={sessions} />}
         {page === 'forms' && <Forms forms={forms} onUpload={() => setShowUploadForm(true)} />}
-        {page === 'settings' && <Settings />}
+        {page === 'settings' && <SettingsPage />}
       </main>
 
       {showNewSession && (
         <NewSessionModal
           onClose={() => setShowNewSession(false)}
-          onCreate={(session) => {
-            setSessions(prev => [...prev, session])
+          onCreate={async (session) => {
+            const { data: { session: authSession } } = await supabase.auth.getSession()
+            if (!authSession) return
+            const { data } = await supabase.from('sessions').insert({
+              ...session,
+              supervisor_id: authSession.user.id,
+            }).select().single()
+            if (data) setSessions(prev => [data, ...prev])
             setShowNewSession(false)
             setPage('sessions')
           }}
@@ -77,8 +146,14 @@ export default function Home() {
       {showUploadForm && (
         <UploadFormModal
           onClose={() => setShowUploadForm(false)}
-          onUpload={(form) => {
-            setForms(prev => [...prev, form])
+          onUpload={async (form) => {
+            const { data: { session: authSession } } = await supabase.auth.getSession()
+            if (!authSession) return
+            const { data } = await supabase.from('form_templates').insert({
+              ...form,
+              supervisor_id: authSession.user.id,
+            }).select().single()
+            if (data) setForms(prev => [data, ...prev])
             setShowUploadForm(false)
           }}
         />
@@ -87,16 +162,17 @@ export default function Home() {
   )
 }
 
-function Dashboard({ sessions, setPage, onNewSession }: { sessions: Session[], setPage: (p: string) => void, onNewSession: () => void }) {
+function Dashboard({ sessions, setPage, onNewSession, supervisor }: { sessions: Session[], setPage: (p: string) => void, onNewSession: () => void, supervisor: Supervisor | null }) {
   const upcoming = sessions.filter(s => s.status === 'scheduled')
   const live = sessions.filter(s => s.status === 'live')
+  const firstName = supervisor?.full_name?.split(' ')[0] || 'there'
 
   return (
     <div>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px'}}>
         <div>
           <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'#A8A29E', marginBottom:'4px'}}>Welcome</div>
-          <div style={{fontSize:'24px', fontWeight:'500', color:'#1C1917'}}>Good morning, Dr. Reeves</div>
+          <div style={{fontSize:'24px', fontWeight:'500', color:'#1C1917'}}>Good morning, {firstName}</div>
           <div style={{fontSize:'12.5px', color:'#A8A29E', marginTop:'3px'}}>
             {sessions.length === 0 ? 'No sessions yet — create your first one to get started' : `${sessions.length} session${sessions.length > 1 ? 's' : ''} total`}
           </div>
@@ -235,7 +311,7 @@ function Forms({ forms, onUpload }: { forms: FormTemplate[], onUpload: () => voi
   )
 }
 
-function Settings() {
+function SettingsPage() {
   const [toggles, setToggles] = useState({
     autoJoin: true,
     speakerDetection: true,
@@ -297,7 +373,7 @@ function EmptyState({ message, sub, action, onAction }: { message: string, sub: 
   )
 }
 
-function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate: (session: Session) => void }) {
+function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate: (session: Omit<Session, 'id'>) => void }) {
   const [name, setName] = useState('')
   const [date, setDate] = useState('')
   const [time, setTime] = useState('')
@@ -307,11 +383,10 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
   const handleCreate = () => {
     if (!name || !date || !time) return
     onCreate({
-      id: Date.now().toString(),
       name,
       date,
       time,
-      zoomLink,
+      zoom_link: zoomLink,
       students: students.split(',').map(s => s.trim()).filter(Boolean),
       status: 'scheduled',
     })
@@ -323,30 +398,26 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
         <div style={{fontSize:'19px', fontWeight:'500', marginBottom:'4px'}}>New supervision session</div>
         <div style={{fontSize:'12.5px', color:'#A8A29E', marginBottom:'22px'}}>Supervisio will join automatically and handle the notes</div>
 
-        <div style={{marginBottom:'15px'}}>
-          <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Session name</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Group supervision — session 1" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none'}} />
-        </div>
+        {[
+          {label:'Session name', value:name, setter:setName, placeholder:'e.g. Group supervision — session 1', type:'text'},
+          {label:'Zoom link', value:zoomLink, setter:setZoomLink, placeholder:'https://zoom.us/j/...', type:'url'},
+          {label:'Students (up to 3, comma separated)', value:students, setter:setStudents, placeholder:'e.g. Maya Adeyemi, Jordan Bassett', type:'text'},
+        ].map(field => (
+          <div key={field.label} style={{marginBottom:'15px'}}>
+            <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>{field.label}</label>
+            <input type={field.type} value={field.value} onChange={e => field.setter(e.target.value)} placeholder={field.placeholder} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
+          </div>
+        ))}
 
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'15px'}}>
           <div>
             <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none'}} />
+            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
           </div>
           <div>
             <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Time</label>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none'}} />
+            <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
           </div>
-        </div>
-
-        <div style={{marginBottom:'15px'}}>
-          <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Zoom link</label>
-          <input value={zoomLink} onChange={e => setZoomLink(e.target.value)} placeholder="https://zoom.us/j/..." style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none'}} />
-        </div>
-
-        <div style={{marginBottom:'15px'}}>
-          <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Students (up to 3, comma separated)</label>
-          <input value={students} onChange={e => setStudents(e.target.value)} placeholder="e.g. Maya Adeyemi, Jordan Bassett" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none'}} />
         </div>
 
         <div style={{display:'flex', gap:'9px', justifyContent:'flex-end', marginTop:'20px', paddingTop:'18px', borderTop:'1px solid rgba(0,0,0,0.07)'}}>
@@ -358,13 +429,12 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
   )
 }
 
-function UploadFormModal({ onClose, onUpload }: { onClose: () => void, onUpload: (form: FormTemplate) => void }) {
+function UploadFormModal({ onClose, onUpload }: { onClose: () => void, onUpload: (form: Omit<FormTemplate, 'id'>) => void }) {
   const [name, setName] = useState('')
 
   const handleUpload = () => {
     if (!name) return
     onUpload({
-      id: Date.now().toString(),
       name,
       fields: ['Student name', 'Session date', 'Duration', 'Case presented', 'Theoretical approach', 'Supervisor observations', 'Goals for next session', 'Supervisor signature'],
     })
@@ -378,7 +448,7 @@ function UploadFormModal({ onClose, onUpload }: { onClose: () => void, onUpload:
 
         <div style={{marginBottom:'15px'}}>
           <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Program name</label>
-          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Yorkville MACP" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none'}} />
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Yorkville MACP" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
         </div>
 
         <div style={{border:'1.5px dashed rgba(0,0,0,0.12)', borderRadius:'7px', padding:'24px', textAlign:'center', background:'#F9F7F4', cursor:'pointer', marginBottom:'15px'}}>
