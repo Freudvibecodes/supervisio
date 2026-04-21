@@ -27,15 +27,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Session not found' }, { status: 404 })
     }
 
-    const { data: formTemplates } = await supabase
+    const { data: formTemplates, error: formError } = await supabase
       .from('form_templates')
       .select('*')
       .eq('supervisor_id', session.supervisor_id)
 
+console.log('Form templates found:', formTemplates?.length, 'Error:', formError?.message)
+console.log('Looking for supervisor_id:', session.supervisor_id)
+
 const formTemplate = formTemplates?.[0]
 
 if (!formTemplate) {
-  return NextResponse.json({ error: 'No form template found' }, { status: 404 })
+  return NextResponse.json({ error: 'No form template found', supervisorId: session.supervisor_id, formError: formError?.message }, { status: 404 })
 }
 
     console.log('Submitting to AssemblyAI...')
