@@ -18,9 +18,7 @@ export async function POST(request: NextRequest) {
         recording_config: {
           transcript: {
             provider: {
-              assembly_ai_async_chunked: {
-                api_key: process.env.ASSEMBLYAI_API_KEY
-              }
+              assembly_ai_async_chunked: {}
             }
           }
         },
