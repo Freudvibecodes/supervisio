@@ -9,44 +9,32 @@ const supabase = createClient(
 export async function GET() {
   try {
     const now = new Date()
-    
     const torontoOffset = -4 * 60
     const torontoTime = new Date(now.getTime() + torontoOffset * 60 * 1000)
-    const tenMinutesFromNow = new Date(torontoTime.getTime() + 10 * 60 * 1000)
-    const fiveMinutesAgo = new Date(torontoTime.getTime() - 5 * 60 * 1000)
 
     const currentDate = torontoTime.toISOString().split('T')[0]
-    
-    const fromHour = fiveMinutesAgo.getUTCHours().toString().padStart(2, '0')
-    const fromMinute = fiveMinutesAgo.getUTCMinutes().toString().padStart(2, '0')
-    const toHour = tenMinutesFromNow.getUTCHours().toString().padStart(2, '0')
-    const toMinute = tenMinutesFromNow.getUTCMinutes().toString().padStart(2, '0')
 
-    const fromTime = `${fromHour}:${fromMinute}`
-    const toTime = `${toHour}:${toMinute}`
-
-    console.log(`Checking for sessions between ${fromTime} and ${toTime} on ${currentDate}`)
+    console.log(`Current Toronto time: ${torontoTime.toISOString()}`)
+    console.log(`Checking date: ${currentDate}`)
 
     const { data: sessions, error } = await supabase
       .from('sessions')
       .select('*')
       .eq('date', currentDate)
       .eq('status', 'scheduled')
-      .gte('time', fromTime)
-      .lte('time', toTime)
 
     if (error) {
       console.log('Supabase error:', error.message)
       return NextResponse.json({ error: error.message }, { status: 500 })
     }
 
-    console.log(`Found ${sessions?.length || 0} sessions`)
-    console.log('All scheduled sessions:', JSON.stringify(sessions))
+    console.log(`Found ${sessions?.length || 0} sessions total for today`)
+    console.log('Sessions:', JSON.stringify(sessions))
 
     if (!sessions || sessions.length === 0) {
       return NextResponse.json({ 
         message: 'No sessions to start',
-        checked: { date: currentDate, from: fromTime, to: toTime }
+        checked: { date: currentDate }
       })
     }
 
@@ -66,7 +54,6 @@ export async function GET() {
       )
 
       const botData = await botResponse.json()
-
       console.log('Bot response:', JSON.stringify(botData))
 
       if (botData.botId) {
@@ -74,7 +61,6 @@ export async function GET() {
           .from('sessions')
           .update({ status: 'live' })
           .eq('id', session.id)
-
         console.log(`Bot joined session ${session.id}`)
       }
     }
@@ -82,6 +68,7 @@ export async function GET() {
     return NextResponse.json({ message: 'Cron job completed' })
 
   } catch (error) {
+    console.log('Cron error:', error)
     return NextResponse.json({ error: 'Cron job failed' }, { status: 500 })
   }
 }
