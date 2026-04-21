@@ -9,24 +9,37 @@ const supabase = createClient(
 export async function GET() {
   try {
     const now = new Date()
-    const fiveMinutesFromNow = new Date(now.getTime() + 5 * 60 * 1000)
+    
+    const torontoOffset = -4 * 60
+    const torontoTime = new Date(now.getTime() + torontoOffset * 60 * 1000)
+    const fiveMinutesFromNow = new Date(torontoTime.getTime() + 5 * 60 * 1000)
 
-    const currentDate = now.toISOString().split('T')[0]
-    const currentHour = now.getHours().toString().padStart(2, '0')
-    const currentMinute = now.getMinutes().toString().padStart(2, '0')
-    const fiveMinHour = fiveMinutesFromNow.getHours().toString().padStart(2, '0')
-    const fiveMinMinute = fiveMinutesFromNow.getMinutes().toString().padStart(2, '0')
+    const currentDate = torontoTime.toISOString().split('T')[0]
+    const currentHour = torontoTime.getUTCHours().toString().padStart(2, '0')
+    const currentMinute = torontoTime.getUTCMinutes().toString().padStart(2, '0')
+    const fiveMinHour = fiveMinutesFromNow.getUTCHours().toString().padStart(2, '0')
+    const fiveMinMinute = fiveMinutesFromNow.getUTCMinutes().toString().padStart(2, '0')
+
+    const currentTime = `${currentHour}:${currentMinute}`
+    const fiveMinTime = `${fiveMinHour}:${fiveMinMinute}`
+
+    console.log(`Checking for sessions between ${currentTime} and ${fiveMinTime} on ${currentDate}`)
 
     const { data: sessions } = await supabase
       .from('sessions')
       .select('*')
       .eq('date', currentDate)
       .eq('status', 'scheduled')
-      .gte('time', `${currentHour}:${currentMinute}`)
-      .lte('time', `${fiveMinHour}:${fiveMinMinute}`)
+      .gte('time', currentTime)
+      .lte('time', fiveMinTime)
+
+    console.log(`Found ${sessions?.length || 0} sessions`)
 
     if (!sessions || sessions.length === 0) {
-      return NextResponse.json({ message: 'No sessions to start' })
+      return NextResponse.json({ 
+        message: 'No sessions to start',
+        checked: { date: currentDate, from: currentTime, to: fiveMinTime }
+      })
     }
 
     for (const session of sessions) {
