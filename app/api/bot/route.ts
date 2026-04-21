@@ -4,7 +4,9 @@ export async function POST(request: NextRequest) {
   try {
     const { meetingUrl, sessionId } = await request.json()
 
-    const response = await fetch('https://us-west-2.recall.ai/api/v1/bot', {
+    console.log('Sending bot to:', meetingUrl)
+
+    const response = await fetch('https://us-west-2.recall.ai/api/v1/bot/', {
       method: 'POST',
       headers: {
         'Authorization': `Token ${process.env.RECALL_API_KEY}`,
@@ -13,8 +15,14 @@ export async function POST(request: NextRequest) {
       body: JSON.stringify({
         meeting_url: meetingUrl,
         bot_name: 'Supervisio',
-        transcription_options: {
-          provider: 'assembly_ai',
+        recording_config: {
+          transcript: {
+            provider: {
+              assembly_ai: {
+                api_key: process.env.ASSEMBLYAI_API_KEY
+              }
+            }
+          }
         },
         metadata: {
           session_id: sessionId,
@@ -23,6 +31,7 @@ export async function POST(request: NextRequest) {
     })
 
     const data = await response.json()
+    console.log('Recall response:', JSON.stringify(data))
 
     if (!response.ok) {
       return NextResponse.json({ error: data }, { status: response.status })
@@ -31,6 +40,7 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ botId: data.id })
 
   } catch (error) {
+    console.log('Bot error:', error)
     return NextResponse.json({ error: 'Failed to create bot' }, { status: 500 })
   }
 }
