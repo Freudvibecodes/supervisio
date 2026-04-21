@@ -24,12 +24,22 @@ type Supervisor = {
   full_name: string
 }
 
+type Student = {
+  id: string
+  name: string
+  program: string
+  supervisor_id: string
+  created_at: string
+}
+
 export default function Home() {
   const [page, setPage] = useState('dashboard')
   const [sessions, setSessions] = useState<Session[]>([])
   const [forms, setForms] = useState<FormTemplate[]>([])
+  const [students, setStudents] = useState<Student[]>([])
   const [showNewSession, setShowNewSession] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
+  const [showNewStudent, setShowNewStudent] = useState(false)
   const [supervisor, setSupervisor] = useState<Supervisor | null>(null)
   const [loading, setLoading] = useState(true)
 
@@ -51,6 +61,7 @@ export default function Home() {
     setSupervisor(supervisorData)
     loadSessions(session.user.id)
     loadForms(session.user.id)
+    loadStudents(session.user.id)
     setLoading(false)
   }
 
@@ -70,6 +81,15 @@ export default function Home() {
       .eq('supervisor_id', userId)
       .order('created_at', { ascending: false })
     if (data) setForms(data)
+  }
+
+  const loadStudents = async (userId: string) => {
+    const { data } = await supabase
+      .from('students')
+      .select('*')
+      .eq('supervisor_id', userId)
+      .order('created_at', { ascending: false })
+    if (data) setStudents(data)
   }
 
   const handleSignOut = async () => {
@@ -92,18 +112,31 @@ export default function Home() {
           <div style={{fontSize:'18px', fontWeight:'500', color:'#1C1917'}}>● Supervisio</div>
           <div style={{fontSize:'11px', color:'#A8A29E', marginTop:'3px'}}>Clinical supervision, simplified</div>
         </div>
-        <nav style={{flex:1, padding:'12px 10px'}}>
+        <nav style={{flex:1, padding:'12px 10px', overflowY:'auto'}}>
+          <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'0.8px', color:'#A8A29E', padding:'8px 10px 4px', fontWeight:'500'}}>Workspace</div>
           {[
             {id:'dashboard', label:'Overview'},
             {id:'sessions', label:'Sessions'},
             {id:'reports', label:'Ready to review'},
             {id:'forms', label:'Form templates'},
-            {id:'settings', label:'Settings'},
           ].map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'8px 10px', borderRadius:'7px', border:'none', background: page===item.id ? '#EBF3EE' : 'none', color: page===item.id ? '#3B6D54' : '#57534E', fontSize:'13px', cursor:'pointer', marginBottom:'1px', textAlign:'left'}}>
               {item.label}
             </button>
           ))}
+          <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'0.8px', color:'#A8A29E', padding:'12px 10px 4px', fontWeight:'500'}}>Students</div>
+          <button onClick={() => setPage('students')} style={{display:'flex', alignItems:'center', width:'100%', padding:'8px 10px', borderRadius:'7px', border:'none', background: page==='students' ? '#EBF3EE' : 'none', color: page==='students' ? '#3B6D54' : '#57534E', fontSize:'13px', cursor:'pointer', marginBottom:'1px', textAlign:'left'}}>
+            All students
+          </button>
+          {students.map(student => (
+            <button key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', width:'100%', padding:'7px 10px 7px 20px', borderRadius:'7px', border:'none', background: page===`student-${student.id}` ? '#EBF3EE' : 'none', color: page===`student-${student.id}` ? '#3B6D54' : '#57534E', fontSize:'12.5px', cursor:'pointer', marginBottom:'1px', textAlign:'left'}}>
+              {student.name}
+            </button>
+          ))}
+          <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'0.8px', color:'#A8A29E', padding:'12px 10px 4px', fontWeight:'500'}}>Account</div>
+          <button onClick={() => setPage('settings')} style={{display:'flex', alignItems:'center', width:'100%', padding:'8px 10px', borderRadius:'7px', border:'none', background: page==='settings' ? '#EBF3EE' : 'none', color: page==='settings' ? '#3B6D54' : '#57534E', fontSize:'13px', cursor:'pointer', marginBottom:'1px', textAlign:'left'}}>
+            Settings
+          </button>
         </nav>
         <div style={{padding:'14px 10px', borderTop:'1px solid rgba(0,0,0,0.07)'}}>
           <div style={{display:'flex', alignItems:'center', gap:'10px', padding:'8px 10px'}}>
@@ -119,10 +152,20 @@ export default function Home() {
       </aside>
 
       <main style={{marginLeft:'220px', flex:1, padding:'28px 32px'}}>
-        {page === 'dashboard' && <Dashboard sessions={sessions} setPage={setPage} onNewSession={() => setShowNewSession(true)} supervisor={supervisor} />}
-        {page === 'sessions' && <Sessions sessions={sessions} setPage={setPage} onNewSession={() => setShowNewSession(true)} />}
+        {page === 'dashboard' && <Dashboard sessions={sessions} students={students} setPage={setPage} onNewSession={() => setShowNewSession(true)} supervisor={supervisor} />}
+        {page === 'sessions' && <Sessions sessions={sessions} setSessions={setSessions} setPage={setPage} onNewSession={() => setShowNewSession(true)} />}
         {page === 'reports' && <Reports sessions={sessions} />}
         {page === 'forms' && <Forms forms={forms} onUpload={() => setShowUploadForm(true)} />}
+        {page === 'students' && <StudentsPage students={students} sessions={sessions} onNewStudent={() => setShowNewStudent(true)} setPage={setPage} />}
+        {page.startsWith('student-') && (
+          <StudentFile
+            student={students.find(s => s.id === page.replace('student-', '')) || null}
+            sessions={sessions.filter(s => {
+              const student = students.find(st => st.id === page.replace('student-', ''))
+              return student ? s.students.includes(student.name) : false
+            })}
+          />
+        )}
         {page === 'settings' && <SettingsPage />}
       </main>
 
@@ -158,40 +201,63 @@ export default function Home() {
           }}
         />
       )}
+
+      {showNewStudent && (
+        <NewStudentModal
+          onClose={() => setShowNewStudent(false)}
+          onCreate={async (student) => {
+            const { data: { session: authSession } } = await supabase.auth.getSession()
+            if (!authSession) return
+            const { data } = await supabase.from('students').insert({
+              ...student,
+              supervisor_id: authSession.user.id,
+            }).select().single()
+            if (data) setStudents(prev => [data, ...prev])
+            setShowNewStudent(false)
+          }}
+        />
+      )}
     </div>
   )
 }
 
-function Dashboard({ sessions, setPage, onNewSession, supervisor }: { sessions: Session[], setPage: (p: string) => void, onNewSession: () => void, supervisor: Supervisor | null }) {
-  const upcoming = sessions.filter(s => s.status === 'scheduled')
-  const live = sessions.filter(s => s.status === 'live')
+function Dashboard({ sessions, students, setPage, onNewSession, supervisor }: { sessions: Session[], students: Student[], setPage: (p: string) => void, onNewSession: () => void, supervisor: Supervisor | null }) {
   const firstName = supervisor?.full_name?.split(' ')[0] || 'there'
+  const upcoming = sessions.filter(s => s.status === 'scheduled').slice(0, 3)
+  const pendingReview = sessions.filter(s => s.status === 'complete')
+  const today = new Date().toISOString().split('T')[0]
+  const todaySessions = sessions.filter(s => s.date === today)
+
+  const hour = new Date().getHours()
+  const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
 
   return (
     <div>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px'}}>
         <div>
-          <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'#A8A29E', marginBottom:'4px'}}>Welcome</div>
-          <div style={{fontSize:'24px', fontWeight:'500', color:'#1C1917'}}>Good morning, {firstName}</div>
-          <div style={{fontSize:'12.5px', color:'#A8A29E', marginTop:'3px'}}>
-            {sessions.length === 0 ? 'No sessions yet — create your first one to get started' : `${sessions.length} session${sessions.length > 1 ? 's' : ''} total`}
+          <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'#A8A29E', marginBottom:'4px'}}>{new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'})}</div>
+          <div style={{fontSize:'26px', fontWeight:'500', color:'#1C1917'}}>{greeting}, {firstName}</div>
+          <div style={{fontSize:'13px', color:'#A8A29E', marginTop:'3px'}}>
+            {todaySessions.length > 0 ? `You have ${todaySessions.length} session${todaySessions.length > 1 ? 's' : ''} today` : 'No sessions today'}
+            {pendingReview.length > 0 ? ` · ${pendingReview.length} form${pendingReview.length > 1 ? 's' : ''} awaiting review` : ''}
           </div>
         </div>
         <button onClick={onNewSession} style={{background:'#3B6D54', color:'white', border:'none', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', fontWeight:'500', cursor:'pointer'}}>+ New session</button>
       </div>
 
-      {live.length > 0 && (
-        <div style={{background:'#F0F7F3', border:'1px solid rgba(59,109,84,0.15)', borderRadius:'10px', padding:'10px 14px', marginBottom:'18px', fontSize:'12.5px', color:'#3B6D54', cursor:'pointer'}} onClick={() => setPage('live')}>
-          {live[0].name} is live now. Supervisio is recording and taking notes.
+      {pendingReview.length > 0 && (
+        <div onClick={() => setPage('reports')} style={{background:'#FDF2F6', border:'1px solid rgba(157,59,91,0.15)', borderRadius:'10px', padding:'10px 14px', marginBottom:'18px', fontSize:'12.5px', color:'#9D3B5B', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+          <span>{pendingReview.length} form{pendingReview.length > 1 ? 's' : ''} ready for your review and signature</span>
+          <span>→</span>
         </div>
       )}
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'12px', marginBottom:'24px'}}>
         {[
+          {label:'Total students', value: students.length.toString()},
           {label:'Total sessions', value: sessions.length.toString()},
-          {label:'Active students', value: [...new Set(sessions.flatMap(s => s.students))].length.toString()},
-          {label:'Forms generated', value: sessions.filter(s => s.status === 'complete').length.toString()},
-          {label:'Awaiting review', value: sessions.filter(s => s.status === 'complete').length.toString()},
+          {label:'Hours supervised', value: sessions.filter(s => s.status === 'complete').length.toString()},
+          {label:'Forms pending', value: pendingReview.length.toString()},
         ].map(s => (
           <div key={s.label} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'16px 18px'}}>
             <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#A8A29E', marginBottom:'6px'}}>{s.label}</div>
@@ -200,21 +266,70 @@ function Dashboard({ sessions, setPage, onNewSession, supervisor }: { sessions: 
         ))}
       </div>
 
-      {sessions.length === 0 ? (
-        <EmptyState message="No sessions yet" sub="Create your first session to get started" action="Create session" onAction={onNewSession} />
-      ) : (
+      <div style={{display:'grid', gridTemplateColumns:'1.2fr 0.8fr', gap:'16px'}}>
         <div>
-          <div style={{fontSize:'13px', fontWeight:'500', marginBottom:'12px'}}>Upcoming sessions</div>
-          {upcoming.map(s => (
-            <SessionRow key={s.id} session={s} />
-          ))}
+          <div style={{fontSize:'13px', fontWeight:'500', marginBottom:'12px', color:'#1C1917'}}>Student progress</div>
+          {students.length === 0 ? (
+            <div style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'24px', textAlign:'center', color:'#A8A29E', fontSize:'13px'}}>
+              No students yet — <span onClick={() => setPage('students')} style={{color:'#3B6D54', cursor:'pointer'}}>add your first student</span>
+            </div>
+          ) : (
+            <div style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'18px 20px'}}>
+              {students.map((student, i) => {
+                const studentSessions = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete')
+                const hours = studentSessions.length
+                const percent = Math.round(Math.min((hours / 30) * 100, 100))
+                return (
+                  <div key={student.id} style={{marginBottom: i < students.length - 1 ? '16px' : '0'}}>
+                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px'}}>
+                      <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
+                        <div style={{width:'26px', height:'26px', borderRadius:'50%', background:'#EBF3EE', color:'#3B6D54', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'10px', fontWeight:'500'}}>
+                          {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                        </div>
+                        <span style={{fontSize:'13px', fontWeight:'500', cursor:'pointer', color:'#1C1917'}} onClick={() => setPage(`student-${student.id}`)}>{student.name}</span>
+                      </div>
+                      <span style={{fontSize:'12px', color:'#A8A29E'}}>{hours} / 30 hrs</span>
+                    </div>
+                    <div style={{height:'5px', background:'#F2EFE9', borderRadius:'3px', overflow:'hidden'}}>
+                      <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#3B6D54' : percent >= 50 ? '#5A9E7A' : '#EF9F27', borderRadius:'3px', transition:'width 0.5s'}}></div>
+                    </div>
+                    <div style={{fontSize:'11px', color:'#A8A29E', marginTop:'3px'}}>{student.program}</div>
+                    {i < students.length - 1 && <div style={{height:'1px', background:'rgba(0,0,0,0.05)', margin:'14px 0 0'}}></div>}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
-      )}
+
+        <div>
+          <div style={{fontSize:'13px', fontWeight:'500', marginBottom:'12px', color:'#1C1917'}}>Upcoming sessions</div>
+          {upcoming.length === 0 ? (
+            <div style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'24px', textAlign:'center', color:'#A8A29E', fontSize:'13px'}}>
+              No upcoming sessions — <span onClick={onNewSession} style={{color:'#3B6D54', cursor:'pointer'}}>schedule one</span>
+            </div>
+          ) : (
+            upcoming.map(s => (
+              <div key={s.id} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'12px 16px', marginBottom:'8px'}}>
+                <div style={{fontSize:'13px', fontWeight:'500', marginBottom:'2px'}}>{s.name}</div>
+                <div style={{fontSize:'11.5px', color:'#A8A29E'}}>{s.date} · {s.time}</div>
+                <div style={{fontSize:'11.5px', color:'#A8A29E', marginTop:'2px'}}>{s.students.join(', ')}</div>
+              </div>
+            ))
+          )}
+        </div>
+      </div>
     </div>
   )
 }
 
-function Sessions({ sessions, setPage, onNewSession }: { sessions: Session[], setPage: (p: string) => void, onNewSession: () => void }) {
+function Sessions({ sessions, setSessions, setPage, onNewSession }: { sessions: Session[], setSessions: (s: Session[]) => void, setPage: (p: string) => void, onNewSession: () => void }) {
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this session?')) return
+    const { error } = await supabase.from('sessions').delete().eq('id', id)
+    if (!error) setSessions(sessions.filter(s => s.id !== id))
+  }
+
   return (
     <div>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px'}}>
@@ -227,33 +342,28 @@ function Sessions({ sessions, setPage, onNewSession }: { sessions: Session[], se
       {sessions.length === 0 ? (
         <EmptyState message="No sessions yet" sub="Sessions you create will appear here" action="Create your first session" onAction={onNewSession} />
       ) : (
-        sessions.map(s => <SessionRow key={s.id} session={s} />)
+        sessions.map(s => (
+          <div key={s.id} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'8px'}}>
+            <div style={{width:'3px', height:'40px', borderRadius:'2px', background: s.status === 'complete' ? '#D4D0CA' : s.status === 'live' ? '#5A9E7A' : '#EF9F27', flexShrink:0}}></div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:'13.5px', fontWeight:'500'}}>{s.name}</div>
+              <div style={{fontSize:'12px', color:'#A8A29E'}}>{s.date} · {s.time} · {s.students.join(', ')}</div>
+            </div>
+            <span style={{fontSize:'11px', padding:'3px 10px', borderRadius:'20px', fontWeight:'500', background: s.status === 'complete' ? '#F2EFE9' : s.status === 'live' ? '#EBF3EE' : '#FEF3C7', color: s.status === 'complete' ? '#A8A29E' : s.status === 'live' ? '#3B6D54' : '#B45309'}}>
+              {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+            </span>
+            {s.status === 'scheduled' && (
+              <button onClick={() => handleDelete(s.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#A8A29E', padding:'4px', borderRadius:'4px'}} title="Delete session">
+                <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16">
+                  <polyline points="2,4 14,4"/>
+                  <path d="M5 4V2h6v2"/>
+                  <path d="M3 4l1 10h8l1-10"/>
+                </svg>
+              </button>
+            )}
+          </div>
+        ))
       )}
-    </div>
-  )
-}
-
-function SessionRow({ session }: { session: Session }) {
-  const statusColors: Record<string, {bg: string, color: string}> = {
-    live: {bg:'#EBF3EE', color:'#3B6D54'},
-    scheduled: {bg:'#FEF3C7', color:'#B45309'},
-    complete: {bg:'#F2EFE9', color:'#A8A29E'},
-  }
-  const indicatorColors: Record<string, string> = {
-    live: '#5A9E7A',
-    scheduled: '#EF9F27',
-    complete: '#D4D0CA',
-  }
-  return (
-    <div style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'8px', cursor:'pointer'}}>
-      <div style={{width:'3px', height:'40px', borderRadius:'2px', background: indicatorColors[session.status], flexShrink:0}}></div>
-      <div style={{flex:1}}>
-        <div style={{fontSize:'13.5px', fontWeight:'500'}}>{session.name}</div>
-        <div style={{fontSize:'12px', color:'#A8A29E'}}>{session.date} · {session.time} · {session.students.join(', ')}</div>
-      </div>
-      <span style={{fontSize:'11px', padding:'3px 10px', borderRadius:'20px', fontWeight:'500', background: statusColors[session.status].bg, color: statusColors[session.status].color}}>
-        {session.status.charAt(0).toUpperCase() + session.status.slice(1)}
-      </span>
     </div>
   )
 }
@@ -266,7 +376,7 @@ function Reports({ sessions }: { sessions: Session[] }) {
       <div style={{fontSize:'24px', fontWeight:'500', marginBottom:'6px'}}>Ready to review</div>
       <div style={{fontSize:'12.5px', color:'#A8A29E', marginBottom:'20px'}}>Auto-filled forms waiting for your signature</div>
       {completed.length === 0 ? (
-        <EmptyState message="No forms yet" sub="Forms will appear here after sessions are completed" />
+        <EmptyState message="No forms yet" sub="Forms will appear here after sessions are completed and processed" />
       ) : (
         completed.map(s => (
           <div key={s.id} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'8px', cursor:'pointer'}}>
@@ -311,9 +421,125 @@ function Forms({ forms, onUpload }: { forms: FormTemplate[], onUpload: () => voi
   )
 }
 
+function StudentsPage({ students, sessions, onNewStudent, setPage }: { students: Student[], sessions: Session[], onNewStudent: () => void, setPage: (p: string) => void }) {
+  return (
+    <div>
+      <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px'}}>
+        <div>
+          <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'#A8A29E', marginBottom:'4px'}}>All students</div>
+          <div style={{fontSize:'24px', fontWeight:'500'}}>Students</div>
+        </div>
+        <button onClick={onNewStudent} style={{background:'#3B6D54', color:'white', border:'none', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', fontWeight:'500', cursor:'pointer'}}>+ Add student</button>
+      </div>
+      {students.length === 0 ? (
+        <EmptyState message="No students yet" sub="Add your first student to get started" action="Add student" onAction={onNewStudent} />
+      ) : (
+        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
+          {students.map(student => {
+            const studentSessions = sessions.filter(s => s.students.includes(student.name))
+            const completedSessions = studentSessions.filter(s => s.status === 'complete')
+            const hours = completedSessions.length
+            const percent = Math.round(Math.min((hours / 30) * 100, 100))
+            const nextSession = studentSessions.find(s => s.status === 'scheduled')
+            return (
+              <div key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'18px 20px', cursor:'pointer', transition:'all 0.12s'}}>
+                <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'14px'}}>
+                  <div style={{width:'38px', height:'38px', borderRadius:'50%', background:'#EBF3EE', color:'#3B6D54', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'12px', fontWeight:'500'}}>
+                    {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                  </div>
+                  <div>
+                    <div style={{fontSize:'14px', fontWeight:'500'}}>{student.name}</div>
+                    <div style={{fontSize:'11.5px', color:'#A8A29E'}}>{student.program}</div>
+                  </div>
+                </div>
+                <div style={{marginBottom:'8px'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', marginBottom:'4px'}}>
+                    <span style={{fontSize:'11.5px', color:'#A8A29E'}}>Supervision hours</span>
+                    <span style={{fontSize:'11.5px', fontWeight:'500'}}>{hours} / 30</span>
+                  </div>
+                  <div style={{height:'4px', background:'#F2EFE9', borderRadius:'2px', overflow:'hidden'}}>
+                    <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#3B6D54' : percent >= 50 ? '#5A9E7A' : '#EF9F27', borderRadius:'2px'}}></div>
+                  </div>
+                </div>
+                <div style={{fontSize:'11.5px', color:'#A8A29E'}}>
+                  {nextSession ? `Next: ${nextSession.date} · ${nextSession.time}` : 'No upcoming sessions'}
+                </div>
+              </div>
+            )
+          })}
+        </div>
+      )}
+    </div>
+  )
+}
+
+function StudentFile({ student, sessions }: { student: Student | null, sessions: Session[] }) {
+  if (!student) return <EmptyState message="Student not found" sub="This student may have been removed" />
+  
+  const completedSessions = sessions.filter(s => s.status === 'complete')
+  const hours = completedSessions.length
+  const percent = Math.round(Math.min((hours / 30) * 100, 100))
+
+  return (
+    <div>
+      <div style={{display:'flex', alignItems:'center', gap:'14px', marginBottom:'24px'}}>
+        <div style={{width:'48px', height:'48px', borderRadius:'50%', background:'#EBF3EE', color:'#3B6D54', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'14px', fontWeight:'500'}}>
+          {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+        </div>
+        <div>
+          <div style={{fontSize:'24px', fontWeight:'500'}}>{student.name}</div>
+          <div style={{fontSize:'13px', color:'#A8A29E'}}>{student.program}</div>
+        </div>
+      </div>
+
+      <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'12px', marginBottom:'24px'}}>
+        {[
+          {label:'Hours completed', value:`${hours}`},
+          {label:'Hours remaining', value:`${30 - hours}`},
+          {label:'Sessions total', value:`${sessions.length}`},
+          {label:'Forms generated', value:`${completedSessions.length}`},
+        ].map(s => (
+          <div key={s.label} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'16px 18px'}}>
+            <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#A8A29E', marginBottom:'6px'}}>{s.label}</div>
+            <div style={{fontSize:'28px', fontWeight:'500', color:'#1C1917', lineHeight:1}}>{s.value}</div>
+          </div>
+        ))}
+      </div>
+
+      <div style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'18px 20px', marginBottom:'20px'}}>
+        <div style={{display:'flex', justifyContent:'space-between', marginBottom:'8px'}}>
+          <span style={{fontSize:'13px', fontWeight:'500'}}>Progress toward 30 hours</span>
+          <span style={{fontSize:'13px', color:'#A8A29E'}}>{percent}%</span>
+        </div>
+        <div style={{height:'8px', background:'#F2EFE9', borderRadius:'4px', overflow:'hidden'}}>
+          <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#3B6D54' : percent >= 50 ? '#5A9E7A' : '#EF9F27', borderRadius:'4px', transition:'width 0.5s'}}></div>
+        </div>
+        <div style={{fontSize:'11.5px', color:'#A8A29E', marginTop:'6px'}}>{hours} of 30 hours completed · {30 - hours} hours remaining</div>
+      </div>
+
+      <div style={{fontSize:'13px', fontWeight:'500', marginBottom:'12px'}}>Session history</div>
+      {sessions.length === 0 ? (
+        <EmptyState message="No sessions yet" sub="Sessions with this student will appear here" />
+      ) : (
+        sessions.map(s => (
+          <div key={s.id} style={{background:'white', border:'1px solid rgba(0,0,0,0.07)', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'8px'}}>
+            <div style={{width:'3px', height:'40px', borderRadius:'2px', background: s.status === 'complete' ? '#5A9E7A' : '#EF9F27', flexShrink:0}}></div>
+            <div style={{flex:1}}>
+              <div style={{fontSize:'13.5px', fontWeight:'500'}}>{s.name}</div>
+              <div style={{fontSize:'12px', color:'#A8A29E'}}>{s.date} · {s.time}</div>
+            </div>
+            <span style={{fontSize:'11px', padding:'3px 10px', borderRadius:'20px', fontWeight:'500', background: s.status === 'complete' ? '#EBF3EE' : '#FEF3C7', color: s.status === 'complete' ? '#3B6D54' : '#B45309'}}>
+              {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+            </span>
+          </div>
+        ))
+      )}
+    </div>
+  )
+}
+
 function SettingsPage() {
   const [toggles, setToggles] = useState({
-    autoJoin: true,
     speakerDetection: true,
     autoGenerate: true,
     emailForms: false,
@@ -330,10 +556,9 @@ function SettingsPage() {
       <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'#A8A29E', marginBottom:'4px'}}>Account</div>
       <div style={{fontSize:'24px', fontWeight:'500', marginBottom:'20px'}}>Settings</div>
       {[
-        {title:'Session behaviour', items:[
-          {key:'autoJoin', label:'Auto-join Zoom sessions', desc:'Bot joins automatically when a session starts'},
+        {title:'Processing', items:[
           {key:'speakerDetection', label:'Speaker detection', desc:'Identify each person by their opening introduction'},
-          {key:'autoGenerate', label:'Auto-generate forms after session', desc:'Forms are drafted the moment the call ends'},
+          {key:'autoGenerate', label:'Auto-generate forms after upload', desc:'Forms are drafted as soon as recording is processed'},
           {key:'emailForms', label:'Email draft forms for review', desc:'Receive a copy at your registered email address'},
         ]},
         {title:'Notifications', items:[
@@ -393,25 +618,23 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
       students: students.split(',').map(s => s.trim()).filter(Boolean),
       status: 'scheduled',
     })
+    onClose()
   }
 
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(28,25,23,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100}} onClick={(e) => e.target === e.currentTarget && onClose()}>
       <div style={{background:'white', borderRadius:'14px', padding:'26px 28px', width:'460px', maxWidth:'95vw'}}>
         <div style={{fontSize:'19px', fontWeight:'500', marginBottom:'4px'}}>New supervision session</div>
-        <div style={{fontSize:'12.5px', color:'#A8A29E', marginBottom:'22px'}}>Supervisio will join automatically and handle the notes</div>
-
+        <div style={{fontSize:'12.5px', color:'#A8A29E', marginBottom:'22px'}}>Schedule a session and upload the recording afterwards</div>
         {[
           {label:'Session name', value:name, setter:setName, placeholder:'e.g. Group supervision — session 1', type:'text'},
-          {label:'Zoom link', value:zoomLink, setter:setZoomLink, placeholder:'https://zoom.us/j/...', type:'url'},
-          {label:'Students (up to 3, comma separated)', value:students, setter:setStudents, placeholder:'e.g. Maya Adeyemi, Jordan Bassett', type:'text'},
+          {label:'Students (comma separated)', value:students, setter:setStudents, placeholder:'e.g. Maya Adeyemi, Jordan Bassett', type:'text'},
         ].map(field => (
           <div key={field.label} style={{marginBottom:'15px'}}>
             <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>{field.label}</label>
             <input type={field.type} value={field.value} onChange={e => field.setter(e.target.value)} placeholder={field.placeholder} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
           </div>
         ))}
-
         <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'15px'}}>
           <div>
             <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Date</label>
@@ -422,10 +645,44 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
             <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
           </div>
         </div>
-
         <div style={{display:'flex', gap:'9px', justifyContent:'flex-end', marginTop:'20px', paddingTop:'18px', borderTop:'1px solid rgba(0,0,0,0.07)'}}>
           <button onClick={onClose} style={{background:'none', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', cursor:'pointer', color:'#57534E'}}>Cancel</button>
           <button onClick={handleCreate} style={{background:'#3B6D54', color:'white', border:'none', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', fontWeight:'500', cursor:'pointer'}}>Create session</button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+function NewStudentModal({ onClose, onCreate }: { onClose: () => void, onCreate: (student: Omit<Student, 'id' | 'created_at'>) => void }) {
+  const [name, setName] = useState('')
+  const [program, setProgram] = useState('')
+
+  const handleCreate = () => {
+    if (!name || !program) {
+      alert('Please fill in student name and program')
+      return
+    }
+    onCreate({ name, program, supervisor_id: '' })
+    onClose()
+  }
+
+  return (
+    <div style={{position:'fixed', inset:0, background:'rgba(28,25,23,0.4)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100}} onClick={(e) => e.target === e.currentTarget && onClose()}>
+      <div style={{background:'white', borderRadius:'14px', padding:'26px 28px', width:'420px', maxWidth:'95vw'}}>
+        <div style={{fontSize:'19px', fontWeight:'500', marginBottom:'4px'}}>Add student</div>
+        <div style={{fontSize:'12.5px', color:'#A8A29E', marginBottom:'22px'}}>Create a file for a new student</div>
+        <div style={{marginBottom:'15px'}}>
+          <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Full name</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Maya Adeyemi" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
+        </div>
+        <div style={{marginBottom:'15px'}}>
+          <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Program</label>
+          <input value={program} onChange={e => setProgram(e.target.value)} placeholder="e.g. Yorkville MACP" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
+        </div>
+        <div style={{display:'flex', gap:'9px', justifyContent:'flex-end', marginTop:'20px', paddingTop:'18px', borderTop:'1px solid rgba(0,0,0,0.07)'}}>
+          <button onClick={onClose} style={{background:'none', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', cursor:'pointer', color:'#57534E'}}>Cancel</button>
+          <button onClick={handleCreate} style={{background:'#3B6D54', color:'white', border:'none', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', fontWeight:'500', cursor:'pointer'}}>Add student</button>
         </div>
       </div>
     </div>
@@ -441,6 +698,7 @@ function UploadFormModal({ onClose, onUpload }: { onClose: () => void, onUpload:
       name,
       fields: ['Student name', 'Session date', 'Duration', 'Case presented', 'Theoretical approach', 'Supervisor observations', 'Goals for next session', 'Supervisor signature'],
     })
+    onClose()
   }
 
   return (
@@ -448,18 +706,15 @@ function UploadFormModal({ onClose, onUpload }: { onClose: () => void, onUpload:
       <div style={{background:'white', borderRadius:'14px', padding:'26px 28px', width:'420px', maxWidth:'95vw'}}>
         <div style={{fontSize:'19px', fontWeight:'500', marginBottom:'4px'}}>Upload form template</div>
         <div style={{fontSize:'12.5px', color:'#A8A29E', marginBottom:'22px'}}>Supervisio will learn the fields and fill them automatically</div>
-
         <div style={{marginBottom:'15px'}}>
           <label style={{display:'block', fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#57534E', fontWeight:'500', marginBottom:'5px'}}>Program name</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Yorkville MACP" style={{width:'100%', padding:'9px 12px', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', fontSize:'13.5px', fontFamily:'system-ui', outline:'none', boxSizing:'border-box'}} />
         </div>
-
         <div style={{border:'1.5px dashed rgba(0,0,0,0.12)', borderRadius:'7px', padding:'24px', textAlign:'center', background:'#F9F7F4', cursor:'pointer', marginBottom:'15px'}}>
           <div style={{fontSize:'24px', marginBottom:'8px'}}>📄</div>
           <div style={{fontSize:'13px', fontWeight:'500', color:'#57534E'}}>Drop your form here or click to browse</div>
           <div style={{fontSize:'11.5px', color:'#A8A29E', marginTop:'3px'}}>PDF or Word — fields detected automatically</div>
         </div>
-
         <div style={{display:'flex', gap:'9px', justifyContent:'flex-end', marginTop:'20px', paddingTop:'18px', borderTop:'1px solid rgba(0,0,0,0.07)'}}>
           <button onClick={onClose} style={{background:'none', border:'1px solid rgba(0,0,0,0.12)', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', cursor:'pointer', color:'#57534E'}}>Cancel</button>
           <button onClick={handleUpload} style={{background:'#3B6D54', color:'white', border:'none', borderRadius:'7px', padding:'8px 16px', fontSize:'13px', fontWeight:'500', cursor:'pointer'}}>Save template</button>
