@@ -381,7 +381,10 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
   const [students, setStudents] = useState('')
 
   const handleCreate = () => {
-    if (!name || !date || !time) return
+    if (!name || !date || !time) {
+      alert('Please fill in session name, date and time')
+      return
+    }
     onCreate({
       name,
       date,
