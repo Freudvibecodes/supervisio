@@ -33,6 +33,7 @@ export async function GET() {
 
       const pollData = await pollResponse.json()
       console.log(`Session ${session.id} transcript status: ${pollData.status}`)
+      console.log(`Transcript error: ${pollData.error}`, `Audio url: ${pollData.audio_url}`)
 
       if (pollData.status === 'completed') {
         const fullTranscript = pollData.utterances
