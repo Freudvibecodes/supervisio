@@ -9,8 +9,9 @@ type Session = {
   time: string
   zoom_link: string
   recording_url: string
+  transcript_id: string
   students: string[]
-  status: 'scheduled' | 'live' | 'complete'
+  status: 'scheduled' | 'live' | 'complete' | 'processing' | 'failed'
 }
 
 type FormTemplate = {
@@ -33,11 +34,20 @@ type Student = {
   created_at: string
 }
 
+type GeneratedForm = {
+  id: string
+  session_id: string
+  student_name: string
+  form_data: Record<string, string>
+  status: string
+}
+
 export default function Home() {
   const [page, setPage] = useState('dashboard')
   const [sessions, setSessions] = useState<Session[]>([])
   const [forms, setForms] = useState<FormTemplate[]>([])
   const [students, setStudents] = useState<Student[]>([])
+  const [generatedForms, setGeneratedForms] = useState<GeneratedForm[]>([])
   const [showNewSession, setShowNewSession] = useState(false)
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [showNewStudent, setShowNewStudent] = useState(false)
@@ -54,6 +64,7 @@ export default function Home() {
     loadSessions(session.user.id)
     loadForms(session.user.id)
     loadStudents(session.user.id)
+    loadGeneratedForms(session.user.id)
     setLoading(false)
   }
 
@@ -70,6 +81,15 @@ export default function Home() {
   const loadStudents = async (userId: string) => {
     const { data } = await supabase.from('students').select('*').eq('supervisor_id', userId).order('created_at', { ascending: false })
     if (data) setStudents(data)
+  }
+
+  const loadGeneratedForms = async (userId: string) => {
+    const { data } = await supabase
+      .from('generated_forms')
+      .select('*, sessions!inner(supervisor_id)')
+      .eq('sessions.supervisor_id', userId)
+      .order('created_at', { ascending: false })
+    if (data) setGeneratedForms(data)
   }
 
   const handleSignOut = async () => {
@@ -90,7 +110,7 @@ export default function Home() {
       <aside style={{width:'230px', background:'white', borderRight:'1px solid #E8E3DB', display:'flex', flexDirection:'column', flexShrink:0, position:'fixed', top:0, left:0, bottom:0}}>
         <div style={{padding:'22px 20px 18px', borderBottom:'1px solid #E8E3DB'}}>
           <div style={{fontSize:'18px', fontWeight:'600', color:'#1C1917', display:'flex', alignItems:'center', gap:'8px'}}>
-            <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3B6D54'}}></div>
+            <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#2D5A42'}}></div>
             Supervisio
           </div>
           <div style={{fontSize:'11px', color:'#78716C', marginTop:'3px'}}>Clinical supervision, simplified</div>
@@ -105,6 +125,11 @@ export default function Home() {
           ].map(item => (
             <button key={item.id} onClick={() => setPage(item.id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'8px 10px', borderRadius:'7px', border:'none', background: page===item.id ? '#EBF3EE' : 'none', color: page===item.id ? '#1C5C3E' : '#44403C', fontSize:'13.5px', fontWeight: page===item.id ? '500' : '400', cursor:'pointer', marginBottom:'1px', textAlign:'left'}}>
               {item.label}
+              {item.id === 'reports' && generatedForms.filter(f => f.status === 'pending').length > 0 && (
+                <span style={{marginLeft:'auto', background:'#7D2A48', color:'white', fontSize:'10px', padding:'1px 6px', borderRadius:'10px', fontWeight:'600'}}>
+                  {generatedForms.filter(f => f.status === 'pending').length}
+                </span>
+              )}
             </button>
           ))}
           <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'0.8px', color:'#78716C', padding:'12px 10px 4px', fontWeight:'600'}}>Students</div>
@@ -135,9 +160,9 @@ export default function Home() {
       </aside>
 
       <main style={{marginLeft:'230px', flex:1, padding:'32px 36px'}}>
-        {page === 'dashboard' && <Dashboard sessions={sessions} students={students} setPage={setPage} onNewSession={() => setShowNewSession(true)} supervisor={supervisor} />}
+        {page === 'dashboard' && <Dashboard sessions={sessions} students={students} generatedForms={generatedForms} setPage={setPage} onNewSession={() => setShowNewSession(true)} supervisor={supervisor} />}
         {page === 'sessions' && <Sessions sessions={sessions} setSessions={setSessions} onNewSession={() => setShowNewSession(true)} />}
-        {page === 'reports' && <Reports sessions={sessions} />}
+        {page === 'reports' && <Reports generatedForms={generatedForms} sessions={sessions} setGeneratedForms={setGeneratedForms} />}
         {page === 'forms' && <Forms forms={forms} onUpload={() => setShowUploadForm(true)} />}
         {page === 'students' && <StudentsPage students={students} sessions={sessions} onNewStudent={() => setShowNewStudent(true)} setPage={setPage} />}
         {page.startsWith('student-') && (
@@ -147,6 +172,7 @@ export default function Home() {
               const student = students.find(st => st.id === page.replace('student-', ''))
               return student ? s.students.includes(student.name) : false
             })}
+            generatedForms={generatedForms}
           />
         )}
         {page === 'settings' && <SettingsPage />}
@@ -204,10 +230,10 @@ export default function Home() {
   )
 }
 
-function Dashboard({ sessions, students, setPage, onNewSession, supervisor }: { sessions: Session[], students: Student[], setPage: (p: string) => void, onNewSession: () => void, supervisor: Supervisor | null }) {
+function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, supervisor }: { sessions: Session[], students: Student[], generatedForms: GeneratedForm[], setPage: (p: string) => void, onNewSession: () => void, supervisor: Supervisor | null }) {
   const firstName = supervisor?.full_name?.split(' ')[0] || 'there'
   const upcoming = sessions.filter(s => s.status === 'scheduled').slice(0, 3)
-  const pendingReview = sessions.filter(s => s.status === 'complete')
+  const pendingForms = generatedForms.filter(f => f.status === 'pending')
   const today = new Date().toISOString().split('T')[0]
   const todaySessions = sessions.filter(s => s.date === today)
   const hour = new Date().getHours()
@@ -221,29 +247,36 @@ function Dashboard({ sessions, students, setPage, onNewSession, supervisor }: { 
           <div style={{fontSize:'28px', fontWeight:'600', color:'#1C1917'}}>{greeting}, {firstName}</div>
           <div style={{fontSize:'14px', color:'#57534E', marginTop:'4px'}}>
             {todaySessions.length > 0 ? `${todaySessions.length} session${todaySessions.length > 1 ? 's' : ''} today` : 'No sessions today'}
-            {pendingReview.length > 0 ? ` · ${pendingReview.length} form${pendingReview.length > 1 ? 's' : ''} awaiting review` : ''}
+            {pendingForms.length > 0 ? ` · ${pendingForms.length} form${pendingForms.length > 1 ? 's' : ''} awaiting review` : ''}
           </div>
         </div>
         <button onClick={onNewSession} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer'}}>+ New session</button>
       </div>
 
-      {pendingReview.length > 0 && (
+      {pendingForms.length > 0 && (
         <div onClick={() => setPage('reports')} style={{background:'#FDF2F6', border:'1px solid #F4C0D1', borderRadius:'10px', padding:'12px 16px', marginBottom:'20px', fontSize:'13px', color:'#7D2A48', cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontWeight:'500'}}>
-          <span>📋 {pendingReview.length} form{pendingReview.length > 1 ? 's' : ''} ready for your review and signature</span>
+          <span>📋 {pendingForms.length} form{pendingForms.length > 1 ? 's' : ''} ready for your review and signature</span>
           <span>→</span>
+        </div>
+      )}
+
+      {sessions.filter(s => s.status === 'processing').length > 0 && (
+        <div style={{background:'#EFF6FF', border:'1px solid #BFDBFE', borderRadius:'10px', padding:'12px 16px', marginBottom:'20px', fontSize:'13px', color:'#1E40AF', display:'flex', alignItems:'center', gap:'10px'}}>
+          <div style={{width:'8px', height:'8px', borderRadius:'50%', background:'#3B82F6', flexShrink:0}}></div>
+          {sessions.filter(s => s.status === 'processing').length} recording{sessions.filter(s => s.status === 'processing').length > 1 ? 's' : ''} being transcribed — forms will appear automatically when ready
         </div>
       )}
 
       <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'12px', marginBottom:'28px'}}>
         {[
-          {label:'Total students', value: students.length.toString(), color:'#1C1917'},
-          {label:'Total sessions', value: sessions.length.toString(), color:'#1C1917'},
-          {label:'Hours supervised', value: sessions.filter(s => s.status === 'complete').length.toString(), color:'#1C1917'},
-          {label:'Forms pending', value: pendingReview.length.toString(), color: pendingReview.length > 0 ? '#7D2A48' : '#1C1917'},
+          {label:'Total students', value: students.length.toString()},
+          {label:'Total sessions', value: sessions.length.toString()},
+          {label:'Hours supervised', value: sessions.filter(s => s.status === 'complete').length.toString()},
+          {label:'Forms pending', value: pendingForms.length.toString()},
         ].map(s => (
           <div key={s.label} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'16px 18px'}}>
             <div style={{fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#78716C', marginBottom:'8px', fontWeight:'500'}}>{s.label}</div>
-            <div style={{fontSize:'30px', fontWeight:'600', color:s.color, lineHeight:1}}>{s.value}</div>
+            <div style={{fontSize:'30px', fontWeight:'600', color:'#1C1917', lineHeight:1}}>{s.value}</div>
           </div>
         ))}
       </div>
@@ -253,7 +286,7 @@ function Dashboard({ sessions, students, setPage, onNewSession, supervisor }: { 
           <div style={{fontSize:'14px', fontWeight:'600', color:'#1C1917', marginBottom:'12px'}}>Student progress</div>
           {students.length === 0 ? (
             <div style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'28px', textAlign:'center'}}>
-              <div style={{fontSize:'13px', color:'#78716C'}}>No students yet —</div>
+              <div style={{fontSize:'13px', color:'#78716C'}}>No students yet — </div>
               <span onClick={() => setPage('students')} style={{fontSize:'13px', color:'#2D5A42', cursor:'pointer', fontWeight:'500'}}>add your first student</span>
             </div>
           ) : (
@@ -290,7 +323,7 @@ function Dashboard({ sessions, students, setPage, onNewSession, supervisor }: { 
           {upcoming.length === 0 ? (
             <div style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'28px', textAlign:'center'}}>
               <div style={{fontSize:'13px', color:'#78716C'}}>No upcoming sessions</div>
-              <span onClick={onNewSession} style={{fontSize:'13px', color:'#2D5A42', cursor:'pointer', fontWeight:'500'}}>schedule one</span>
+              <span onClick={onNewSession} style={{fontSize:'13px', color:'#2D5A42', cursor:'pointer', fontWeight:'500', display:'block', marginTop:'4px'}}>schedule one</span>
             </div>
           ) : (
             upcoming.map(s => (
@@ -321,32 +354,47 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
   const handleUploadRecording = async (sessionId: string) => {
     if (!recordingUrl) { alert('Please enter a recording URL'); return }
     setProcessing(sessionId)
-    
+
     await supabase.from('sessions').update({ recording_url: recordingUrl }).eq('id', sessionId)
-    setSessions(sessions.map(s => s.id === sessionId ? {...s, recording_url: recordingUrl} : s))
-    
+
     try {
       const response = await fetch('/api/process-recording', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ sessionId, recordingUrl }),
       })
-      
+
       const data = await response.json()
-      
+
       if (data.success) {
-        setSessions(sessions.map(s => s.id === sessionId ? {...s, recording_url: recordingUrl, status: 'complete'} : s))
+        setSessions(sessions.map(s => s.id === sessionId ? { ...s, recording_url: recordingUrl, status: 'processing' } : s))
         setUploadingFor(null)
         setRecordingUrl('')
-        alert('Forms generated successfully! Check Ready to review.')
+        alert('Recording submitted! Your forms will be ready within 15-20 minutes depending on the length of the recording.')
       } else {
-        alert('Processing failed: ' + (data.error || 'Unknown error'))
+        alert('Submission failed: ' + (data.error || 'Unknown error'))
       }
     } catch {
-      alert('Processing failed. Please try again.')
+      alert('Submission failed. Please try again.')
     }
-    
+
     setProcessing(null)
+  }
+
+  const statusConfig: Record<string, { bg: string, color: string, label: string }> = {
+    scheduled: { bg: '#FEF3C7', color: '#92400E', label: 'Scheduled' },
+    processing: { bg: '#EFF6FF', color: '#1E40AF', label: 'Processing' },
+    complete: { bg: '#EBF3EE', color: '#1C5C3E', label: 'Complete' },
+    live: { bg: '#EBF3EE', color: '#1C5C3E', label: 'Live' },
+    failed: { bg: '#FEF2F2', color: '#991B1B', label: 'Failed' },
+  }
+
+  const indicatorConfig: Record<string, string> = {
+    scheduled: '#D97706',
+    processing: '#3B82F6',
+    complete: '#2D5A42',
+    live: '#5A9E7A',
+    failed: '#EF4444',
   }
 
   return (
@@ -364,13 +412,16 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
         sessions.map(s => (
           <div key={s.id}>
             <div style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom: uploadingFor === s.id ? '0' : '10px', borderBottomLeftRadius: uploadingFor === s.id ? '0' : '10px', borderBottomRightRadius: uploadingFor === s.id ? '0' : '10px'}}>
-              <div style={{width:'3px', height:'44px', borderRadius:'2px', background: s.status === 'complete' ? '#2D5A42' : s.status === 'live' ? '#5A9E7A' : '#D97706', flexShrink:0}}></div>
+              <div style={{width:'3px', height:'44px', borderRadius:'2px', background: indicatorConfig[s.status] || '#D97706', flexShrink:0}}></div>
               <div style={{flex:1}}>
                 <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{s.name}</div>
                 <div style={{fontSize:'12.5px', color:'#57534E', marginTop:'2px'}}>{s.date} · {s.time} · {s.students.join(', ')}</div>
+                {s.status === 'processing' && (
+                  <div style={{fontSize:'11.5px', color:'#1E40AF', marginTop:'3px'}}>Transcribing recording — forms will appear in Ready to review when done</div>
+                )}
               </div>
-              <span style={{fontSize:'11.5px', padding:'4px 10px', borderRadius:'20px', fontWeight:'500', background: s.status === 'complete' ? '#EBF3EE' : s.status === 'live' ? '#EBF3EE' : '#FEF3C7', color: s.status === 'complete' ? '#1C5C3E' : s.status === 'live' ? '#1C5C3E' : '#92400E'}}>
-                {s.status.charAt(0).toUpperCase() + s.status.slice(1)}
+              <span style={{fontSize:'11.5px', padding:'4px 10px', borderRadius:'20px', fontWeight:'500', background: statusConfig[s.status]?.bg || '#FEF3C7', color: statusConfig[s.status]?.color || '#92400E'}}>
+                {statusConfig[s.status]?.label || s.status}
               </span>
               {s.status === 'scheduled' && (
                 <button onClick={() => setUploadingFor(uploadingFor === s.id ? null : s.id)} style={{background:'#EBF3EE', border:'none', borderRadius:'7px', padding:'6px 12px', fontSize:'12px', color:'#1C5C3E', cursor:'pointer', fontWeight:'500', whiteSpace:'nowrap'}}>
@@ -387,7 +438,7 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
             </div>
             {uploadingFor === s.id && (
               <div style={{background:'#F9F7F4', border:'1px solid #E8E3DB', borderTop:'none', borderBottomLeftRadius:'10px', borderBottomRightRadius:'10px', padding:'16px 18px', marginBottom:'10px'}}>
-                <div style={{fontSize:'12.5px', fontWeight:'500', color:'#1C1917', marginBottom:'10px'}}>Add session recording</div>
+                <div style={{fontSize:'13px', fontWeight:'500', color:'#1C1917', marginBottom:'10px'}}>Add session recording</div>
                 <div style={{display:'flex', gap:'8px', marginBottom:'10px'}}>
                   <input
                     value={recordingUrl}
@@ -395,12 +446,12 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
                     placeholder="Paste Zoom or Teams recording link..."
                     style={{flex:1, padding:'8px 12px', border:'1px solid #D4CFC8', borderRadius:'7px', fontSize:'13px', fontFamily:'system-ui', outline:'none', color:'#1C1917'}}
                   />
-                  <button onClick={() => handleUploadRecording(s.id)} disabled={processing === s.id} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'7px', padding:'8px 14px', fontSize:'13px', fontWeight:'500', cursor:'pointer', whiteSpace:'nowrap'}}>
-                    {processing === s.id ? 'Saving...' : 'Save'}
+                  <button onClick={() => handleUploadRecording(s.id)} disabled={processing === s.id} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'7px', padding:'8px 14px', fontSize:'13px', fontWeight:'500', cursor:'pointer', whiteSpace:'nowrap', opacity: processing === s.id ? 0.7 : 1}}>
+                    {processing === s.id ? 'Submitting...' : 'Submit'}
                   </button>
                 </div>
-                <div style={{fontSize:'12px', color:'#78716C'}}>Or upload a file directly:</div>
-                <div style={{border:'1.5px dashed #D4CFC8', borderRadius:'7px', padding:'16px', textAlign:'center', background:'white', cursor:'pointer', marginTop:'8px'}}>
+                <div style={{fontSize:'12px', color:'#78716C', marginBottom:'8px'}}>Or upload a file directly:</div>
+                <div style={{border:'1.5px dashed #D4CFC8', borderRadius:'7px', padding:'16px', textAlign:'center', background:'white', cursor:'pointer'}}>
                   <div style={{fontSize:'13px', color:'#57534E', fontWeight:'500'}}>Click to upload recording</div>
                   <div style={{fontSize:'11.5px', color:'#78716C', marginTop:'2px'}}>MP4, MOV, or M4A</div>
                 </div>
@@ -413,28 +464,97 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
   )
 }
 
-function Reports({ sessions }: { sessions: Session[] }) {
-  const completed = sessions.filter(s => s.status === 'complete')
+function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedForms: GeneratedForm[], sessions: Session[], setGeneratedForms: (f: GeneratedForm[]) => void }) {
+  const [selectedForm, setSelectedForm] = useState<GeneratedForm | null>(null)
+  const pending = generatedForms.filter(f => f.status === 'pending')
+  const signed = generatedForms.filter(f => f.status === 'signed')
+
+  const handleSign = async (formId: string) => {
+    await supabase.from('generated_forms').update({ status: 'signed' }).eq('id', formId)
+    setGeneratedForms(generatedForms.map(f => f.id === formId ? { ...f, status: 'signed' } : f))
+    setSelectedForm(null)
+  }
+
+  const getSessionName = (sessionId: string) => {
+    return sessions.find(s => s.id === sessionId)?.name || 'Session'
+  }
+
+  if (selectedForm) {
+    return (
+      <div>
+        <button onClick={() => setSelectedForm(null)} style={{background:'none', border:'none', cursor:'pointer', color:'#57534E', fontSize:'13.5px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'6px', padding:0}}>
+          ← Back to forms
+        </button>
+        <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px'}}>
+          <div>
+            <div style={{fontSize:'12px', color:'#78716C', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>{getSessionName(selectedForm.session_id)}</div>
+            <div style={{fontSize:'26px', fontWeight:'600', color:'#1C1917'}}>{selectedForm.student_name}</div>
+            <div style={{fontSize:'13.5px', color:'#57534E', marginTop:'3px'}}>Auto-filled supervision form — review and sign</div>
+          </div>
+          {selectedForm.status === 'pending' && (
+            <button onClick={() => handleSign(selectedForm.id)} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer'}}>
+              ✓ Sign & approve
+            </button>
+          )}
+        </div>
+        <div style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'24px 26px'}}>
+          {Object.entries(selectedForm.form_data).map(([key, value]) => (
+            <div key={key} style={{marginBottom:'20px', paddingBottom:'20px', borderBottom:'1px solid #F2EFE9'}}>
+              <div style={{fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#78716C', fontWeight:'600', marginBottom:'6px'}}>{key}</div>
+              <div style={{fontSize:'14px', color:'#1C1917', lineHeight:'1.6'}}>{value}</div>
+            </div>
+          ))}
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div>
       <div style={{fontSize:'12px', color:'#78716C', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>Documents</div>
       <div style={{fontSize:'26px', fontWeight:'600', color:'#1C1917', marginBottom:'6px'}}>Ready to review</div>
       <div style={{fontSize:'13.5px', color:'#57534E', marginBottom:'20px'}}>Auto-filled forms waiting for your signature</div>
-      {completed.length === 0 ? (
-        <EmptyState message="No forms yet" sub="Forms will appear here after sessions are processed" />
+
+      {pending.length === 0 && signed.length === 0 ? (
+        <EmptyState message="No forms yet" sub="Forms will appear here after session recordings are processed" />
       ) : (
-        completed.map(s => (
-          <div key={s.id} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px', cursor:'pointer'}}>
-            <div style={{width:'38px', height:'38px', borderRadius:'8px', background:'#FDF2F6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-              <svg width="16" height="16" fill="none" stroke="#7D2A48" strokeWidth="1.5" viewBox="0 0 16 16"><path d="M4 2h8v12H4z"/><line x1="6.5" y1="6" x2="9.5" y2="6"/><line x1="6.5" y1="9" x2="9.5" y2="9"/></svg>
-            </div>
-            <div style={{flex:1}}>
-              <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{s.name}</div>
-              <div style={{fontSize:'12.5px', color:'#57534E', marginTop:'2px'}}>{s.students.join(', ')} · {s.date}</div>
-            </div>
-            <span style={{fontSize:'12px', padding:'4px 12px', borderRadius:'20px', background:'#FDF2F6', color:'#7D2A48', fontWeight:'500'}}>Review</span>
-          </div>
-        ))
+        <>
+          {pending.length > 0 && (
+            <>
+              <div style={{fontSize:'13px', fontWeight:'600', color:'#1C1917', marginBottom:'10px'}}>Needs your signature</div>
+              {pending.map(f => (
+                <div key={f.id} onClick={() => setSelectedForm(f)} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px', cursor:'pointer'}}>
+                  <div style={{width:'38px', height:'38px', borderRadius:'8px', background:'#FDF2F6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                    <svg width="16" height="16" fill="none" stroke="#7D2A48" strokeWidth="1.5" viewBox="0 0 16 16"><path d="M4 2h8v12H4z"/><line x1="6.5" y1="6" x2="9.5" y2="6"/><line x1="6.5" y1="9" x2="9.5" y2="9"/></svg>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{f.student_name}</div>
+                    <div style={{fontSize:'12.5px', color:'#57534E', marginTop:'2px'}}>{getSessionName(f.session_id)}</div>
+                  </div>
+                  <span style={{fontSize:'12px', padding:'4px 12px', borderRadius:'20px', background:'#FDF2F6', color:'#7D2A48', fontWeight:'500'}}>Review & sign</span>
+                </div>
+              ))}
+            </>
+          )}
+
+          {signed.length > 0 && (
+            <>
+              <div style={{fontSize:'13px', fontWeight:'600', color:'#1C1917', margin:'20px 0 10px'}}>Previously signed</div>
+              {signed.map(f => (
+                <div key={f.id} onClick={() => setSelectedForm(f)} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px', cursor:'pointer'}}>
+                  <div style={{width:'38px', height:'38px', borderRadius:'8px', background:'#EBF3EE', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                    <svg width="16" height="16" fill="none" stroke="#1C5C3E" strokeWidth="1.5" viewBox="0 0 16 16"><polyline points="3,8 6.5,11.5 13,5"/></svg>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{f.student_name}</div>
+                    <div style={{fontSize:'12.5px', color:'#57534E', marginTop:'2px'}}>{getSessionName(f.session_id)}</div>
+                  </div>
+                  <span style={{fontSize:'12px', padding:'4px 12px', borderRadius:'20px', background:'#EBF3EE', color:'#1C5C3E', fontWeight:'500'}}>Signed</span>
+                </div>
+              ))}
+            </>
+          )}
+        </>
       )}
     </div>
   )
@@ -522,11 +642,12 @@ function StudentsPage({ students, sessions, onNewStudent, setPage }: { students:
   )
 }
 
-function StudentFile({ student, sessions }: { student: Student | null, sessions: Session[] }) {
+function StudentFile({ student, sessions, generatedForms }: { student: Student | null, sessions: Session[], generatedForms: GeneratedForm[] }) {
   if (!student) return <EmptyState message="Student not found" sub="This student may have been removed" />
   const completedSessions = sessions.filter(s => s.status === 'complete')
   const hours = completedSessions.length
   const percent = Math.round(Math.min((hours / 30) * 100, 100))
+  const studentForms = generatedForms.filter(f => f.student_name === student.name)
 
   return (
     <div>
@@ -545,7 +666,7 @@ function StudentFile({ student, sessions }: { student: Student | null, sessions:
           {label:'Hours completed', value:`${hours}`},
           {label:'Hours remaining', value:`${Math.max(30 - hours, 0)}`},
           {label:'Sessions total', value:`${sessions.length}`},
-          {label:'Forms generated', value:`${completedSessions.length}`},
+          {label:'Forms generated', value:`${studentForms.length}`},
         ].map(s => (
           <div key={s.label} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'16px 18px'}}>
             <div style={{fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#78716C', marginBottom:'8px', fontWeight:'500'}}>{s.label}</div>
@@ -594,7 +715,7 @@ function SettingsPage() {
     reminders: true,
     formAlerts: true,
   })
-  const toggle = (key: keyof typeof toggles) => setToggles(prev => ({...prev, [key]: !prev[key]}))
+  const toggle = (key: keyof typeof toggles) => setToggles(prev => ({ ...prev, [key]: !prev[key] }))
 
   return (
     <div>
@@ -614,7 +735,7 @@ function SettingsPage() {
         <div key={section.title} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', marginBottom:'14px', overflow:'hidden'}}>
           <div style={{fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.7px', color:'#78716C', fontWeight:'600', padding:'16px 20px 12px', borderBottom:'1px solid #E8E3DB'}}>{section.title}</div>
           {section.items.map((item, i) => (
-            <div key={item.key} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom: i < section.items.length-1 ? '1px solid #F2EFE9' : 'none'}}>
+            <div key={item.key} style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'16px 20px', borderBottom: i < section.items.length - 1 ? '1px solid #F2EFE9' : 'none'}}>
               <div>
                 <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{item.label}</div>
                 <div style={{fontSize:'12.5px', color:'#78716C', marginTop:'2px'}}>{item.desc}</div>
@@ -653,7 +774,7 @@ function NewSessionModal({ onClose, onCreate }: { onClose: () => void, onCreate:
 
   const handleCreate = () => {
     if (!name || !date || !time) { alert('Please fill in session name, date and time'); return }
-    onCreate({ name, date, time, zoom_link: '', recording_url: '', students: students.split(',').map(s => s.trim()).filter(Boolean), status: 'scheduled' })
+    onCreate({ name, date, time, zoom_link: '', recording_url: '', transcript_id: '', students: students.split(',').map(s => s.trim()).filter(Boolean), status: 'scheduled' })
     onClose()
   }
 

@@ -32,6 +32,7 @@ export async function POST(request: NextRequest) {
         audio_url: recordingUrl,
         speaker_labels: true,
         speakers_expected: session.students.length + 1,
+        speech_model: 'universal-2',
       }),
     })
 
