@@ -33,11 +33,10 @@ export async function GET() {
 
       const pollData = await pollResponse.json()
       console.log(`Session ${session.id} transcript status: ${pollData.status}`)
-      console.log(`Transcript error: ${pollData.error}`, `Audio url: ${pollData.audio_url}`)
 
       if (pollData.status === 'completed') {
         const fullTranscript = pollData.utterances
-          ? pollData.utterances.map((u: { speaker: string, text: string }) => 
+          ? pollData.utterances.map((u: { speaker: string, text: string }) =>
               `Speaker ${u.speaker}: ${u.text}`).join('\n')
           : pollData.text
 
@@ -50,13 +49,14 @@ export async function GET() {
 
         if (!formTemplate) {
           console.log('No form template found for session', session.id)
+          await supabase.from('sessions').update({ status: 'failed' }).eq('id', session.id)
           continue
         }
 
         for (const studentName of session.students) {
           const message = await anthropic.messages.create({
             model: 'claude-sonnet-4-20250514',
-            max_tokens: 1024,
+            max_tokens: 2048,
             messages: [{
               role: 'user',
               content: `You are helping fill in a clinical supervision form for a student named ${studentName}.
@@ -64,12 +64,21 @@ export async function GET() {
 Here is the transcript from the supervision session:
 ${fullTranscript}
 
-Please fill in the following form fields based on what was discussed about ${studentName} in the transcript. If a field cannot be determined, write "Not discussed in this session".
+Please fill in the following form fields based on what was discussed about ${studentName} in the transcript. If a field cannot be determined from the transcript, write "Not discussed in this session".
 
 Form fields:
 ${formTemplate.fields.map((f: string) => `- ${f}`).join('\n')}
 
-Respond ONLY with a valid JSON object where each key is the field name and the value is what should be filled in. No explanation, just JSON.`,
+Rules:
+- Respond ONLY with a raw JSON object
+- Do NOT wrap in markdown code blocks
+- Do NOT include backticks or the word json
+- Each key must exactly match the field name
+- Each value should be a clear, professional sentence or two
+- Never use bullet points inside values
+
+Example format:
+{"Field name": "Professional answer here", "Another field": "Another answer here"}`,
             }],
           })
 
@@ -78,7 +87,11 @@ Respond ONLY with a valid JSON object where each key is the field name and the v
 
           let formData
           try {
-            formData = JSON.parse(content.text)
+            const cleaned = content.text
+              .replace(/```json\n?/gi, '')
+              .replace(/```\n?/gi, '')
+              .trim()
+            formData = JSON.parse(cleaned)
           } catch {
             formData = { note: content.text }
           }
@@ -97,8 +110,8 @@ Respond ONLY with a valid JSON object where each key is the field name and the v
         console.log(`Session ${session.id} complete`)
 
       } else if (pollData.status === 'error') {
+        console.log(`Transcript error: ${pollData.error}`)
         await supabase.from('sessions').update({ status: 'failed' }).eq('id', session.id)
-        console.log(`Session ${session.id} failed`)
       }
     }
 
