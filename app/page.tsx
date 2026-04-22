@@ -86,7 +86,7 @@ export default function Home() {
   const loadGeneratedForms = async (userId: string) => {
     const { data } = await supabase
       .from('generated_forms')
-      .select('*, sessions!inner(supervisor_id)')
+      .select('*, sessions!inner(supervisor_id, name)')
       .eq('sessions.supervisor_id', userId)
       .order('created_at', { ascending: false })
     if (data) setGeneratedForms(data)
@@ -163,7 +163,7 @@ export default function Home() {
         {page === 'dashboard' && <Dashboard sessions={sessions} students={students} generatedForms={generatedForms} setPage={setPage} onNewSession={() => setShowNewSession(true)} supervisor={supervisor} />}
         {page === 'sessions' && <Sessions sessions={sessions} setSessions={setSessions} onNewSession={() => setShowNewSession(true)} />}
         {page === 'reports' && <Reports generatedForms={generatedForms} sessions={sessions} setGeneratedForms={setGeneratedForms} />}
-        {page === 'forms' && <Forms forms={forms} onUpload={() => setShowUploadForm(true)} />}
+        {page === 'forms' && <Forms forms={forms} setForms={setForms} onUpload={() => setShowUploadForm(true)} />}
         {page === 'students' && <StudentsPage students={students} sessions={sessions} onNewStudent={() => setShowNewStudent(true)} setPage={setPage} />}
         {page.startsWith('student-') && (
           <StudentFile
@@ -362,7 +362,6 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
     try {
       const formData = new FormData()
       formData.append('sessionId', sessionId)
-
       if (selectedFile) {
         formData.append('file', selectedFile)
       } else {
@@ -500,13 +499,42 @@ function Sessions({ sessions, setSessions, onNewSession }: { sessions: Session[]
 
 function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedForms: GeneratedForm[], sessions: Session[], setGeneratedForms: (f: GeneratedForm[]) => void }) {
   const [selectedForm, setSelectedForm] = useState<GeneratedForm | null>(null)
+  const [downloading, setDownloading] = useState(false)
   const pending = generatedForms.filter(f => f.status === 'pending')
   const signed = generatedForms.filter(f => f.status === 'signed')
 
   const handleSign = async (formId: string) => {
     await supabase.from('generated_forms').update({ status: 'signed' }).eq('id', formId)
     setGeneratedForms(generatedForms.map(f => f.id === formId ? { ...f, status: 'signed' } : f))
-    setSelectedForm(null)
+  }
+
+  const handleDownload = async (form: GeneratedForm) => {
+    setDownloading(true)
+    try {
+      const sessionName = sessions.find(s => s.id === form.session_id)?.name || 'Session'
+      const response = await fetch('/api/export-form', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          studentName: form.student_name,
+          sessionName,
+          formData: form.form_data,
+        }),
+      })
+
+      if (!response.ok) throw new Error('Export failed')
+
+      const blob = await response.blob()
+      const url = URL.createObjectURL(blob)
+      const a = document.createElement('a')
+      a.href = url
+      a.download = `${form.student_name}-supervision-form.docx`
+      a.click()
+      URL.revokeObjectURL(url)
+    } catch {
+      alert('Download failed. Please try again.')
+    }
+    setDownloading(false)
   }
 
   const getSessionName = (sessionId: string) => {
@@ -523,19 +551,28 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
           <div>
             <div style={{fontSize:'12px', color:'#78716C', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>{getSessionName(selectedForm.session_id)}</div>
             <div style={{fontSize:'26px', fontWeight:'600', color:'#1C1917'}}>{selectedForm.student_name}</div>
-            <div style={{fontSize:'13.5px', color:'#57534E', marginTop:'3px'}}>Auto-filled supervision form — review and sign</div>
+            <div style={{fontSize:'13.5px', color:'#57534E', marginTop:'3px'}}>Auto-filled supervision form — review, download or sign off</div>
           </div>
-          {selectedForm.status === 'pending' && (
-            <button onClick={() => handleSign(selectedForm.id)} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer'}}>
-              ✓ Sign & approve
+          <div style={{display:'flex', gap:'10px'}}>
+            <button
+              onClick={() => handleDownload(selectedForm)}
+              disabled={downloading}
+              style={{background:'white', color:'#2D5A42', border:'1px solid #2D5A42', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer', opacity: downloading ? 0.7 : 1}}
+            >
+              {downloading ? 'Preparing...' : '↓ Download Word doc'}
             </button>
-          )}
+            {selectedForm.status === 'pending' && (
+              <button onClick={() => handleSign(selectedForm.id)} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer'}}>
+                ✓ Mark as reviewed
+              </button>
+            )}
+          </div>
         </div>
         <div style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'24px 26px'}}>
-          {Object.entries(selectedForm.form_data).map(([key, value]) => (
-            <div key={key} style={{marginBottom:'20px', paddingBottom:'20px', borderBottom:'1px solid #F2EFE9'}}>
-              <div style={{fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#78716C', fontWeight:'600', marginBottom:'6px'}}>{key}</div>
-              <div style={{fontSize:'14px', color:'#1C1917', lineHeight:'1.6'}}>{value}</div>
+          {Object.entries(selectedForm.form_data).map(([key, value], i, arr) => (
+            <div key={key} style={{marginBottom: i < arr.length - 1 ? '20px' : '0', paddingBottom: i < arr.length - 1 ? '20px' : '0', borderBottom: i < arr.length - 1 ? '1px solid #F2EFE9' : 'none'}}>
+              <div style={{fontSize:'11px', textTransform:'uppercase', letterSpacing:'0.6px', color:'#78716C', fontWeight:'600', marginBottom:'6px'}}>{key}</div>
+              <div style={{fontSize:'14px', color:'#1C1917', lineHeight:'1.7'}}>{value}</div>
             </div>
           ))}
         </div>
@@ -547,7 +584,7 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
     <div>
       <div style={{fontSize:'12px', color:'#78716C', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>Documents</div>
       <div style={{fontSize:'26px', fontWeight:'600', color:'#1C1917', marginBottom:'6px'}}>Ready to review</div>
-      <div style={{fontSize:'13.5px', color:'#57534E', marginBottom:'20px'}}>Auto-filled forms waiting for your signature</div>
+      <div style={{fontSize:'13.5px', color:'#57534E', marginBottom:'20px'}}>Auto-filled forms — review on screen or download as a Word document</div>
 
       {pending.length === 0 && signed.length === 0 ? (
         <EmptyState message="No forms yet" sub="Forms will appear here after session recordings are processed" />
@@ -555,9 +592,9 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
         <>
           {pending.length > 0 && (
             <>
-              <div style={{fontSize:'13px', fontWeight:'600', color:'#1C1917', marginBottom:'10px'}}>Needs your signature</div>
+              <div style={{fontSize:'13px', fontWeight:'600', color:'#1C1917', marginBottom:'10px'}}>Awaiting review</div>
               {pending.map(f => (
-                <div key={f.id} onClick={() => setSelectedForm(f)} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px', cursor:'pointer'}}>
+                <div key={f.id} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px'}}>
                   <div style={{width:'38px', height:'38px', borderRadius:'8px', background:'#FDF2F6', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
                     <svg width="16" height="16" fill="none" stroke="#7D2A48" strokeWidth="1.5" viewBox="0 0 16 16"><path d="M4 2h8v12H4z"/><line x1="6.5" y1="6" x2="9.5" y2="6"/><line x1="6.5" y1="9" x2="9.5" y2="9"/></svg>
                   </div>
@@ -565,7 +602,12 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
                     <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{f.student_name}</div>
                     <div style={{fontSize:'12.5px', color:'#57534E', marginTop:'2px'}}>{getSessionName(f.session_id)}</div>
                   </div>
-                  <span style={{fontSize:'12px', padding:'4px 12px', borderRadius:'20px', background:'#FDF2F6', color:'#7D2A48', fontWeight:'500'}}>Review & sign</span>
+                  <button onClick={() => handleDownload(f)} style={{background:'none', border:'1px solid #E8E3DB', borderRadius:'7px', padding:'6px 12px', fontSize:'12px', color:'#57534E', cursor:'pointer', fontWeight:'500', whiteSpace:'nowrap'}}>
+                    ↓ Download
+                  </button>
+                  <button onClick={() => setSelectedForm(f)} style={{background:'#FDF2F6', border:'none', borderRadius:'7px', padding:'6px 12px', fontSize:'12px', color:'#7D2A48', cursor:'pointer', fontWeight:'500', whiteSpace:'nowrap'}}>
+                    Review
+                  </button>
                 </div>
               ))}
             </>
@@ -573,9 +615,9 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
 
           {signed.length > 0 && (
             <>
-              <div style={{fontSize:'13px', fontWeight:'600', color:'#1C1917', margin:'20px 0 10px'}}>Previously signed</div>
+              <div style={{fontSize:'13px', fontWeight:'600', color:'#1C1917', margin:'20px 0 10px'}}>Reviewed</div>
               {signed.map(f => (
-                <div key={f.id} onClick={() => setSelectedForm(f)} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px', cursor:'pointer'}}>
+                <div key={f.id} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'14px 18px', display:'flex', alignItems:'center', gap:'14px', marginBottom:'10px'}}>
                   <div style={{width:'38px', height:'38px', borderRadius:'8px', background:'#EBF3EE', display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
                     <svg width="16" height="16" fill="none" stroke="#1C5C3E" strokeWidth="1.5" viewBox="0 0 16 16"><polyline points="3,8 6.5,11.5 13,5"/></svg>
                   </div>
@@ -583,7 +625,12 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
                     <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917'}}>{f.student_name}</div>
                     <div style={{fontSize:'12.5px', color:'#57534E', marginTop:'2px'}}>{getSessionName(f.session_id)}</div>
                   </div>
-                  <span style={{fontSize:'12px', padding:'4px 12px', borderRadius:'20px', background:'#EBF3EE', color:'#1C5C3E', fontWeight:'500'}}>Signed</span>
+                  <button onClick={() => handleDownload(f)} style={{background:'none', border:'1px solid #E8E3DB', borderRadius:'7px', padding:'6px 12px', fontSize:'12px', color:'#57534E', cursor:'pointer', fontWeight:'500', whiteSpace:'nowrap'}}>
+                    ↓ Download
+                  </button>
+                  <button onClick={() => setSelectedForm(f)} style={{background:'none', border:'1px solid #E8E3DB', borderRadius:'7px', padding:'6px 12px', fontSize:'12px', color:'#57534E', cursor:'pointer', fontWeight:'500', whiteSpace:'nowrap'}}>
+                    View
+                  </button>
                 </div>
               ))}
             </>
@@ -594,14 +641,20 @@ function Reports({ generatedForms, sessions, setGeneratedForms }: { generatedFor
   )
 }
 
-function Forms({ forms, onUpload }: { forms: FormTemplate[], onUpload: () => void }) {
+function Forms({ forms, setForms, onUpload }: { forms: FormTemplate[], setForms: (f: FormTemplate[]) => void, onUpload: () => void }) {
+  const handleDelete = async (id: string) => {
+    if (!confirm('Delete this form template?')) return
+    await supabase.from('form_templates').delete().eq('id', id)
+    setForms(forms.filter(f => f.id !== id))
+  }
+
   return (
     <div>
       <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'20px'}}>
         <div>
           <div style={{fontSize:'12px', color:'#78716C', marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>Templates</div>
           <div style={{fontSize:'26px', fontWeight:'600', color:'#1C1917'}}>Form templates</div>
-          <div style={{fontSize:'13.5px', color:'#57534E', marginTop:'3px'}}>Upload any program's form — Supervisio learns the fields automatically</div>
+          <div style={{fontSize:'13.5px', color:'#57534E', marginTop:'3px'}}>Upload your supervision form — Supervisio reads the fields and fills them automatically</div>
         </div>
         <button onClick={onUpload} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer'}}>+ Upload form</button>
       </div>
@@ -610,9 +663,14 @@ function Forms({ forms, onUpload }: { forms: FormTemplate[], onUpload: () => voi
       ) : (
         <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
           {forms.map(f => (
-            <div key={f.id} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'18px 20px', cursor:'pointer'}}>
-              <div style={{width:'36px', height:'36px', borderRadius:'8px', background:'#EBF3EE', display:'flex', alignItems:'center', justifyContent:'center', marginBottom:'12px'}}>
-                <svg width="16" height="16" fill="none" stroke="#1C5C3E" strokeWidth="1.5" viewBox="0 0 16 16"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><polyline points="9,2 9,6 13,6"/></svg>
+            <div key={f.id} style={{background:'white', border:'1px solid #E8E3DB', borderRadius:'10px', padding:'18px 20px'}}>
+              <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'12px'}}>
+                <div style={{width:'36px', height:'36px', borderRadius:'8px', background:'#EBF3EE', display:'flex', alignItems:'center', justifyContent:'center'}}>
+                  <svg width="16" height="16" fill="none" stroke="#1C5C3E" strokeWidth="1.5" viewBox="0 0 16 16"><path d="M9 2H4a1 1 0 00-1 1v10a1 1 0 001 1h8a1 1 0 001-1V6L9 2z"/><polyline points="9,2 9,6 13,6"/></svg>
+                </div>
+                <button onClick={() => handleDelete(f.id)} style={{background:'none', border:'none', cursor:'pointer', color:'#A8A29E', padding:'2px'}}>
+                  <svg width="14" height="14" fill="none" stroke="currentColor" strokeWidth="1.5" viewBox="0 0 16 16"><polyline points="2,4 14,4"/><path d="M5 4V2h6v2"/><path d="M3 4l1 10h8l1-10"/></svg>
+                </button>
               </div>
               <div style={{fontSize:'14px', fontWeight:'500', color:'#1C1917', marginBottom:'3px'}}>{f.name}</div>
               <div style={{fontSize:'12px', color:'#78716C'}}>{f.fields.length} fields detected</div>
@@ -878,32 +936,85 @@ function NewStudentModal({ onClose, onCreate }: { onClose: () => void, onCreate:
 
 function UploadFormModal({ onClose, onUpload }: { onClose: () => void, onUpload: (form: Omit<FormTemplate, 'id'>) => void }) {
   const [name, setName] = useState('')
+  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [parsing, setParsing] = useState(false)
 
-  const handleUpload = () => {
-    if (!name) return
-    onUpload({ name, fields: ['Student name', 'Session date', 'Duration', 'Case presented', 'Theoretical approach', 'Supervisor observations', 'Goals for next session', 'Supervisor signature'] })
+  const handleUpload = async () => {
+    if (!name) { alert('Please enter a program name'); return }
+    setParsing(true)
+
+    try {
+      if (selectedFile) {
+        const formData = new FormData()
+        formData.append('file', selectedFile)
+
+        const response = await fetch('/api/parse-form', {
+          method: 'POST',
+          body: formData,
+        })
+
+        const data = await response.json()
+
+        if (data.fields && data.fields.length > 0) {
+          onUpload({ name, fields: data.fields })
+          alert(`Form parsed successfully — ${data.fields.length} fields detected`)
+        } else {
+          alert('Could not detect fields from the document. Using default fields.')
+          onUpload({ name, fields: ['Student name', 'Session date', 'Duration', 'Case presented', 'Theoretical approach', 'Supervisor observations', 'Goals for next session', 'Supervisor signature'] })
+        }
+      } else {
+        onUpload({ name, fields: ['Student name', 'Session date', 'Duration', 'Case presented', 'Theoretical approach', 'Supervisor observations', 'Goals for next session', 'Supervisor signature'] })
+      }
+    } catch {
+      alert('Upload failed. Using default fields.')
+      onUpload({ name, fields: ['Student name', 'Session date', 'Duration', 'Case presented', 'Theoretical approach', 'Supervisor observations', 'Goals for next session', 'Supervisor signature'] })
+    }
+
+    setParsing(false)
     onClose()
   }
 
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(28,25,23,0.45)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100}} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{background:'white', borderRadius:'14px', padding:'28px 30px', width:'420px', maxWidth:'95vw'}}>
+      <div style={{background:'white', borderRadius:'14px', padding:'28px 30px', width:'460px', maxWidth:'95vw'}}>
         <div style={{fontSize:'20px', fontWeight:'600', color:'#1C1917', marginBottom:'4px'}}>Upload form template</div>
-        <div style={{fontSize:'13px', color:'#78716C', marginBottom:'24px'}}>Supervisio will learn the fields and fill them automatically</div>
+        <div style={{fontSize:'13px', color:'#78716C', marginBottom:'24px'}}>Upload your Word doc — Supervisio reads the fields automatically</div>
         <div style={{marginBottom:'16px'}}>
           <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color:'#44403C', fontWeight:'600', marginBottom:'6px'}}>Program name</label>
           <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Yorkville MACP" style={{width:'100%', padding:'10px 12px', border:'1px solid #D4CFC8', borderRadius:'8px', fontSize:'14px', fontFamily:'system-ui', outline:'none', color:'#1C1917', boxSizing:'border-box'}} />
         </div>
-        <div style={{border:'1.5px dashed #D4CFC8', borderRadius:'8px', padding:'24px', textAlign:'center', background:'#F9F7F4', cursor:'pointer', marginBottom:'16px'}}>
+        <div
+          style={{border:'1.5px dashed #D4CFC8', borderRadius:'8px', padding:'24px', textAlign:'center', background:'#F9F7F4', cursor:'pointer', marginBottom:'16px'}}
+          onClick={() => document.getElementById('form-file-input')?.click()}
+        >
           <div style={{width:'36px', height:'36px', borderRadius:'8px', background:'#EBF3EE', display:'flex', alignItems:'center', justifyContent:'center', margin:'0 auto 10px'}}>
             <svg width="16" height="16" fill="none" stroke="#1C5C3E" strokeWidth="1.5" viewBox="0 0 16 16"><path d="M8 2v8M5 5l3-3 3 3"/><path d="M3 11v2h10v-2"/></svg>
           </div>
-          <div style={{fontSize:'13.5px', fontWeight:'500', color:'#44403C'}}>Drop your form here or click to browse</div>
-          <div style={{fontSize:'12px', color:'#78716C', marginTop:'3px'}}>PDF or Word — fields detected automatically</div>
+          <div style={{fontSize:'13.5px', fontWeight:'500', color:'#44403C'}}>
+            {selectedFile ? `✓ ${selectedFile.name}` : 'Click to upload your form'}
+          </div>
+          <div style={{fontSize:'12px', color:'#78716C', marginTop:'3px'}}>Word doc (.docx) — fields detected automatically</div>
+          <input
+            id="form-file-input"
+            type="file"
+            accept=".docx"
+            style={{display:'none'}}
+            onChange={e => {
+              const file = e.target.files?.[0]
+              if (file) setSelectedFile(file)
+            }}
+          />
         </div>
+        {!selectedFile && (
+          <div style={{fontSize:'12px', color:'#78716C', marginBottom:'16px', textAlign:'center'}}>
+            Don't have the form yet? We'll use 8 default fields for now.
+          </div>
+        )}
         <div style={{display:'flex', gap:'10px', justifyContent:'flex-end', marginTop:'20px', paddingTop:'20px', borderTop:'1px solid #F2EFE9'}}>
           <button onClick={onClose} style={{background:'none', border:'1px solid #D4CFC8', borderRadius:'8px', padding:'9px 16px', fontSize:'13.5px', cursor:'pointer', color:'#44403C'}}>Cancel</button>
-          <button onClick={handleUpload} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer'}}>Save template</button>
+          <button onClick={handleUpload} disabled={parsing} style={{background:'#2D5A42', color:'white', border:'none', borderRadius:'8px', padding:'9px 18px', fontSize:'13.5px', fontWeight:'500', cursor:'pointer', opacity: parsing ? 0.7 : 1}}>
+            {parsing ? 'Reading form...' : 'Save template'}
+          </button>
         </div>
       </div>
     </div>
