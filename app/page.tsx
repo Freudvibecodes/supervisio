@@ -264,37 +264,38 @@ function LandingPage() {
         <div style={{display:'inline-block', background:'rgba(255,255,255,0.1)', color:'#A8D5BC', fontSize:'12px', fontWeight:'600', padding:'6px 16px', borderRadius:'20px', letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:'28px'}}>
           Built for clinical supervisors
         </div>
-        <h1 style={{fontSize:'58px', fontWeight:'800', color:'white', lineHeight:'1.1', letterSpacing:'-1.5px', margin:'0 auto 24px', maxWidth:'760px'}}>
+        <h1 style={{fontSize:'56px', fontWeight:'800', color:'white', lineHeight:'1.1', letterSpacing:'-1.5px', margin:'0 auto 24px', maxWidth:'760px'}}>
           Supervision paperwork,<br />
           <span style={{color:'#6BCF94'}}>done automatically.</span>
         </h1>
         <p style={{fontSize:'19px', color:'#A8D5BC', lineHeight:'1.7', maxWidth:'560px', margin:'0 auto 44px'}}>
-          Upload your session recording. Supervisio transcribes it, fills in your supervision forms per student, and generates a Word doc ready to submit — in minutes.
+          Upload your session recording. Supervisio transcribes it, fills in your supervision forms per student, and generates a Word document ready to submit — automatically.
         </p>
         <div style={{display:'flex', gap:'14px', justifyContent:'center', alignItems:'center'}}>
-          <a href="/auth" style={{background:'#6BCF94', color:'#1A3C2E', padding:'14px 32px', borderRadius:'10px', fontSize:'16px', fontWeight:'700', textDecoration:'none', letterSpacing:'0.1px'}}>Start for free →</a>
+          <a href="/auth" style={{background:'#6BCF94', color:'#1A3C2E', padding:'14px 32px', borderRadius:'10px', fontSize:'16px', fontWeight:'700', textDecoration:'none'}}>Start for free →</a>
           <a href="#how" style={{color:'#A8D5BC', fontSize:'15px', fontWeight:'500', textDecoration:'none'}}>See how it works ↓</a>
         </div>
       </div>
 
       {/* Problem */}
       <div style={{background:'#EDE8DF', padding:'80px 60px', textAlign:'center'}}>
-        <div style={{maxWidth:'700px', margin:'0 auto'}}>
-          <h2 style={{fontSize:'36px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'20px'}}>
-            Supervisors are drowning in paperwork
+        <div style={{maxWidth:'680px', margin:'0 auto'}}>
+          <h2 style={{fontSize:'34px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'20px'}}>
+            Designed to reduce administrative burden
           </h2>
           <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.8', marginBottom:'48px'}}>
-            After every supervision session, you rewatch the recording, recall what each student discussed, and manually fill in pages of forms — for every student, every week. It takes hours. And it's why many supervisors won't take on practicum students at all.
+            Clinical supervision involves meaningful documentation requirements. Supervisio handles the time-consuming parts — transcription, organization, and form completion — so supervisors can focus on what matters most: the supervisory relationship.
           </p>
           <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'20px'}}>
             {[
-              {stat:'2-3 hrs', desc:'spent on paperwork per session'},
-              {stat:'30 sessions', desc:'of supervision required per student'},
-              {stat:'5 pages', desc:'of forms per student per session'},
+              {icon:'🎙', label:'Automatic transcription', desc:'Session recordings are transcribed with speaker identification'},
+              {icon:'📋', label:'Form auto-completion', desc:'Supervision form fields are filled based on session content'},
+              {icon:'📥', label:'Document export', desc:'Download a completed Word document ready for submission'},
             ].map(s => (
-              <div key={s.stat} style={{background:'white', borderRadius:'12px', padding:'28px 24px', border:'1px solid rgba(0,0,0,0.08)'}}>
-                <div style={{fontSize:'36px', fontWeight:'800', color:'#1A3C2E', letterSpacing:'-1px', marginBottom:'8px'}}>{s.stat}</div>
-                <div style={{fontSize:'14px', color:'#6B6259', lineHeight:'1.5'}}>{s.desc}</div>
+              <div key={s.label} style={{background:'white', borderRadius:'12px', padding:'28px 24px', border:'1px solid rgba(0,0,0,0.08)', textAlign:'left'}}>
+                <div style={{fontSize:'24px', marginBottom:'12px'}}>{s.icon}</div>
+                <div style={{fontSize:'15px', fontWeight:'600', color:'#1A1614', marginBottom:'8px'}}>{s.label}</div>
+                <div style={{fontSize:'13.5px', color:'#6B6259', lineHeight:'1.6'}}>{s.desc}</div>
               </div>
             ))}
           </div>
@@ -305,18 +306,18 @@ function LandingPage() {
       <div id="how" style={{background:'white', padding:'90px 60px', textAlign:'center'}}>
         <div style={{maxWidth:'800px', margin:'0 auto'}}>
           <div style={{fontSize:'12px', color:'#2D7A52', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>How it works</div>
-          <h2 style={{fontSize:'38px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'56px'}}>Three steps. Zero paperwork.</h2>
+          <h2 style={{fontSize:'36px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'56px'}}>Simple from start to finish</h2>
           <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'32px'}}>
             {[
-              {step:'01', title:'Upload the recording', desc:'After your session ends, download the Zoom recording and upload it to Supervisio. That\'s all you do.'},
-              {step:'02', title:'AI does the work', desc:'Supervisio transcribes the session, identifies each student, and fills in your supervision form fields automatically.'},
-              {step:'03', title:'Download and submit', desc:'Review the auto-filled form on screen, download the Word doc, make any edits, and submit to the school.'},
+              {step:'01', title:'Upload your form', desc:'Start by uploading your program\'s supervision form. Supervisio reads the fields and learns what information to capture.'},
+              {step:'02', title:'Add a session recording', desc:'After each supervision session, upload the recording. Supervisio transcribes it and identifies each participant.'},
+              {step:'03', title:'Review and download', desc:'A completed form is generated per student. Review it on screen, download the Word document, and submit.'},
             ].map(s => (
               <div key={s.step} style={{textAlign:'left'}}>
                 <div style={{fontSize:'13px', fontWeight:'700', color:'#2D7A52', letterSpacing:'1px', marginBottom:'14px'}}>{s.step}</div>
-                <div style={{width:'48px', height:'2px', background:'#2D7A52', marginBottom:'20px', borderRadius:'2px'}}></div>
-                <h3 style={{fontSize:'20px', fontWeight:'700', color:'#1A1614', marginBottom:'12px', letterSpacing:'-0.3px'}}>{s.title}</h3>
-                <p style={{fontSize:'15px', color:'#6B6259', lineHeight:'1.7'}}>{s.desc}</p>
+                <div style={{width:'40px', height:'2px', background:'#2D7A52', marginBottom:'20px', borderRadius:'2px'}}></div>
+                <h3 style={{fontSize:'19px', fontWeight:'700', color:'#1A1614', marginBottom:'12px', letterSpacing:'-0.2px'}}>{s.title}</h3>
+                <p style={{fontSize:'14.5px', color:'#6B6259', lineHeight:'1.75'}}>{s.desc}</p>
               </div>
             ))}
           </div>
@@ -327,21 +328,21 @@ function LandingPage() {
       <div style={{background:'#1A3C2E', padding:'90px 60px'}}>
         <div style={{maxWidth:'900px', margin:'0 auto'}}>
           <div style={{textAlign:'center', marginBottom:'56px'}}>
-            <div style={{fontSize:'12px', color:'#6BCF94', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>Features</div>
-            <h2 style={{fontSize:'38px', fontWeight:'700', color:'white', letterSpacing:'-0.8px'}}>Everything you need</h2>
+            <div style={{fontSize:'12px', color:'#6BCF94', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>Capabilities</div>
+            <h2 style={{fontSize:'36px', fontWeight:'700', color:'white', letterSpacing:'-0.8px'}}>Built for clinical practice</h2>
           </div>
           <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px'}}>
             {[
-              {icon:'🎙', title:'Automatic transcription', desc:'Supports Zoom, Teams, and any MP4 recording. Identifies speakers automatically.'},
-              {icon:'📋', title:'Your form, auto-filled', desc:'Upload your program\'s supervision form once. Supervisio fills in every field from the transcript.'},
-              {icon:'👥', title:'Multi-student sessions', desc:'Group supervision? Supervisio creates a separate form for each student in the same session.'},
-              {icon:'📥', title:'Word doc export', desc:'Download a completed Word document, ready to submit to the school. Make edits before sending.'},
-              {icon:'📊', title:'Student progress tracking', desc:'See each student\'s hours, sessions, and progress toward their 30-hour requirement.'},
-              {icon:'⚡', title:'Real-time updates', desc:'Forms appear automatically when processing is done. No refreshing, no waiting.'},
+              {icon:'🎙', title:'Session transcription', desc:'Supports Zoom, Teams, and standard audio/video formats. Speaker identification included.'},
+              {icon:'📋', title:'Custom form support', desc:'Upload your program\'s specific supervision form. Fields are detected and filled accordingly.'},
+              {icon:'👥', title:'Group supervision', desc:'Multiple students in one session are handled individually. A separate form is generated for each.'},
+              {icon:'📥', title:'Word document export', desc:'Download a completed document formatted for submission. Editable before sending.'},
+              {icon:'📊', title:'Student progress', desc:'Track supervision hours and session history for each student in one place.'},
+              {icon:'⚡', title:'Automatic updates', desc:'Forms appear as soon as processing is complete. No manual refresh required.'},
             ].map(f => (
               <div key={f.title} style={{background:'rgba(255,255,255,0.06)', borderRadius:'12px', padding:'24px 26px', border:'1px solid rgba(255,255,255,0.1)'}}>
-                <div style={{fontSize:'22px', marginBottom:'12px'}}>{f.icon}</div>
-                <div style={{fontSize:'16px', fontWeight:'600', color:'white', marginBottom:'8px'}}>{f.title}</div>
+                <div style={{fontSize:'20px', marginBottom:'12px'}}>{f.icon}</div>
+                <div style={{fontSize:'15px', fontWeight:'600', color:'white', marginBottom:'8px'}}>{f.title}</div>
                 <div style={{fontSize:'14px', color:'#A8D5BC', lineHeight:'1.7'}}>{f.desc}</div>
               </div>
             ))}
@@ -351,24 +352,23 @@ function LandingPage() {
 
       {/* CTA */}
       <div style={{background:'#EDE8DF', padding:'100px 60px', textAlign:'center'}}>
-        <div style={{maxWidth:'580px', margin:'0 auto'}}>
-          <h2 style={{fontSize:'42px', fontWeight:'800', color:'#1A1614', letterSpacing:'-1px', marginBottom:'18px', lineHeight:'1.1'}}>
-            Ready to reclaim your time?
+        <div style={{maxWidth:'540px', margin:'0 auto'}}>
+          <h2 style={{fontSize:'38px', fontWeight:'800', color:'#1A1614', letterSpacing:'-1px', marginBottom:'18px', lineHeight:'1.15'}}>
+            Ready to get started?
           </h2>
           <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.7', marginBottom:'40px'}}>
-            Join supervisors who have eliminated hours of weekly paperwork. Free to get started.
+            Supervisio is free to start. No credit card required.
           </p>
-          <a href="/auth" style={{display:'inline-block', background:'#1A3C2E', color:'white', padding:'16px 40px', borderRadius:'10px', fontSize:'17px', fontWeight:'700', textDecoration:'none', letterSpacing:'0.1px'}}>
-            Get started for free →
+          <a href="/auth" style={{display:'inline-block', background:'#1A3C2E', color:'white', padding:'16px 40px', borderRadius:'10px', fontSize:'17px', fontWeight:'700', textDecoration:'none'}}>
+            Create your account →
           </a>
-          <div style={{fontSize:'13px', color:'#9B9189', marginTop:'16px'}}>No credit card required</div>
         </div>
       </div>
 
       {/* Footer */}
       <div style={{background:'#1A3C2E', padding:'32px 60px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
         <div style={{fontSize:'16px', fontWeight:'700', color:'white'}}>Supervisio</div>
-        <div style={{fontSize:'13px', color:'#6B9B82'}}>Built for clinical supervisors</div>
+        <div style={{fontSize:'13px', color:'#6B9B82'}}>Clinical supervision documentation, simplified</div>
       </div>
     </div>
   )
