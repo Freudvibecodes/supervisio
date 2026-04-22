@@ -119,25 +119,25 @@ export default function Home() {
   const theme = {
     sidebar: d ? '#0D1F17' : '#1A3C2E',
     sidebarHover: d ? '#1A3C2E' : '#234D3A',
-    sidebarActive: d ? '#2D5A42' : '#2D5A42',
-    sidebarText: '#A8C5B5',
+    sidebarActive: d ? '#2D5A42' : '#3D7A5A',
+    sidebarText: '#C8DDD4',
     sidebarTextActive: '#FFFFFF',
-    sidebarBorder: 'rgba(255,255,255,0.08)',
-    bg: d ? '#0F1A14' : '#F5F0E8',
+    sidebarBorder: 'rgba(255,255,255,0.1)',
+    bg: d ? '#0F1A14' : '#EDE8DF',
     surface: d ? '#162119' : '#FFFFFF',
-    surface2: d ? '#1C2D23' : '#F9F5EE',
-    border: d ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.08)',
-    border2: d ? 'rgba(255,255,255,0.14)' : 'rgba(0,0,0,0.14)',
-    text: d ? '#F0EBE1' : '#1C1917',
-    text2: d ? '#A8C5B5' : '#57534E',
-    text3: d ? '#6B9B82' : '#78716C',
+    surface2: d ? '#1C2D23' : '#F0EBE1',
+    border: d ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.1)',
+    border2: d ? 'rgba(255,255,255,0.16)' : 'rgba(0,0,0,0.18)',
+    text: d ? '#F0EBE1' : '#1A1614',
+    text2: d ? '#C8DDD4' : '#3D3530',
+    text3: d ? '#6B9B82' : '#6B6259',
     accent: '#2D7A52',
-    accentLight: d ? '#1A3C2E' : '#E8F5EE',
+    accentLight: d ? '#1A3C2E' : '#DFF0E8',
     accentText: d ? '#6BCF94' : '#1A5C35',
-    gold: '#C9A84C',
-    goldLight: d ? '#2A2210' : '#FDF6E3',
+    gold: '#B8922E',
+    goldLight: d ? '#2A2210' : '#FBF3DC',
     rose: '#9D3B5B',
-    roseLight: d ? '#2A1020' : '#FDF2F6',
+    roseLight: d ? '#2A1020' : '#FCEDF3',
   }
 
   if (loading) {
@@ -149,7 +149,7 @@ export default function Home() {
   }
 
   const NavItem = ({ id, label, badge }: { id: string, label: string, badge?: number }) => (
-    <button onClick={() => setPage(id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'9px 12px', borderRadius:'8px', border:'none', background: page===id ? theme.sidebarActive : 'transparent', color: page===id ? theme.sidebarTextActive : theme.sidebarText, fontSize:'13.5px', fontWeight: page===id ? '500' : '400', cursor:'pointer', marginBottom:'2px', textAlign:'left', transition:'all 0.15s'}}>
+    <button onClick={() => setPage(id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'9px 12px', borderRadius:'8px', border:'none', background: page===id ? theme.sidebarActive : 'transparent', color: page===id ? '#FFFFFF' : '#C8DDD4', fontSize:'14px', fontWeight: page===id ? '600' : '400', cursor:'pointer', marginBottom:'2px', textAlign:'left', transition:'all 0.15s', letterSpacing:'0.1px'}}>
       {label}
       {badge && badge > 0 ? <span style={{marginLeft:'auto', background:'#C9A84C', color:'#1C1917', fontSize:'10px', padding:'1px 7px', borderRadius:'10px', fontWeight:'700'}}>{badge}</span> : null}
     </button>
