@@ -846,7 +846,7 @@ function SettingsPage() {
       <div style={{fontSize:'26px', fontWeight:'600', color:'#1C1917', marginBottom:'20px'}}>Settings</div>
       {[
         {title:'Processing', items:[
-          {key:'speakerDetection', label:'Speaker detection', desc:'Identify each person by their opening introduction'},
+         
           {key:'autoGenerate', label:'Auto-generate forms after upload', desc:'Forms are drafted as soon as recording is processed'},
           {key:'emailForms', label:'Email draft forms for review', desc:'Receive a copy at your registered email address'},
         ]},
