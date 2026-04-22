@@ -305,10 +305,29 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
     ...studentsNoRecentSession.slice(0, 2).map(s => ({ type: 'student', text: `No upcoming session — ${s.name}`, action: () => setPage('students') })),
   ].slice(0, 5)
 
+  const d = theme.sidebar === '#0D1F17'
+  const cardBg = d ? '#1A3C2E22' : '#F2F8F5'
+  const cardBorder = d ? 'rgba(45,122,82,0.25)' : '#D5EBE1'
+  const barBg = d ? 'rgba(45,122,82,0.2)' : '#C8E6D5'
+  const headerBg = d ? '#0D1F17' : '#1A3C2E'
+  const statGoldBg = d ? '#2A2210' : '#FBF3DC'
+  const statGoldBorder = d ? '#6B4A10' : '#E8D5A0'
+
+  const Widget = ({ title, children }: { title: string, children: React.ReactNode }) => (
+    <div style={{borderRadius:'12px', overflow:'hidden', border:`1px solid ${cardBorder}`}}>
+      <div style={{background: headerBg, padding:'10px 16px'}}>
+        <div style={{fontSize:'11px', fontWeight:'700', color:'white', textTransform:'uppercase', letterSpacing:'0.6px'}}>{title}</div>
+      </div>
+      <div style={{background: cardBg, padding:'14px 16px'}}>
+        {children}
+      </div>
+    </div>
+  )
+
   return (
     <div>
-      {/* Hero header */}
-      <div style={{background: theme.sidebar, borderRadius:'14px', padding:'22px 26px', marginBottom:'20px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
+      {/* Hero */}
+      <div style={{background: theme.sidebar, borderRadius:'14px', padding:'22px 26px', marginBottom:'18px', display:'flex', justifyContent:'space-between', alignItems:'center'}}>
         <div>
           <div style={{fontSize:'11px', color:'#A8D5BC', textTransform:'uppercase', letterSpacing:'0.6px', marginBottom:'4px'}}>{new Date().toLocaleDateString('en-US', {weekday:'long', month:'long', day:'numeric', year:'numeric'})}</div>
           <div style={{fontSize:'24px', fontWeight:'700', color:'white', letterSpacing:'-0.3px'}}>{greeting}, {firstName}</div>
@@ -328,143 +347,131 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
         </div>
       )}
 
-      {/* Stats strip */}
-      <div className="stats-grid" style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'12px', marginBottom:'20px'}}>
+      {/* Stats */}
+      <div className="stats-grid" style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'12px', marginBottom:'18px'}}>
         {[
-          {label:'Total students', value: students.length.toString()},
-          {label:'Total sessions', value: sessions.length.toString()},
-          {label:'Hours supervised', value: sessions.filter(s => s.status === 'complete').length.toString()},
-          {label:'Forms pending', value: pendingForms.length.toString()},
+          {label:'Total students', value: students.length.toString(), gold: false},
+          {label:'Total sessions', value: sessions.length.toString(), gold: false},
+          {label:'Hours supervised', value: sessions.filter(s => s.status === 'complete').length.toString(), gold: false},
+          {label:'Forms pending', value: pendingForms.length.toString(), gold: true},
         ].map(s => (
-          <div key={s.label} style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'16px 18px'}}>
-            <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'0.7px', color: theme.text3, marginBottom:'8px', fontWeight:'600'}}>{s.label}</div>
-            <div style={{fontSize:'30px', fontWeight:'700', color: theme.text, lineHeight:1, letterSpacing:'-1px'}}>{s.value}</div>
+          <div key={s.label} style={{background: s.gold ? statGoldBg : cardBg, border:`1px solid ${s.gold ? statGoldBorder : cardBorder}`, borderRadius:'12px', padding:'16px 18px'}}>
+            <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'0.7px', color: s.gold ? theme.gold : theme.text3, marginBottom:'8px', fontWeight:'600'}}>{s.label}</div>
+            <div style={{fontSize:'30px', fontWeight:'700', color: s.gold ? theme.gold : theme.text, lineHeight:1, letterSpacing:'-1px'}}>{s.value}</div>
           </div>
         ))}
       </div>
 
       {/* Three columns */}
-      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'16px', marginBottom:'20px'}}>
+      <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'14px', marginBottom:'18px'}}>
 
-        {/* Column 1 — Students */}
-        <div>
-          <div style={{fontSize:'13px', fontWeight:'600', color: theme.text, marginBottom:'12px'}}>Student progress</div>
+        {/* Students */}
+        <Widget title="Student progress">
           {students.length === 0 ? (
-            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'24px', textAlign:'center'}}>
-              <div style={{fontSize:'12px', color: theme.text3}}>No students yet</div>
-              <span onClick={() => setPage('students')} style={{fontSize:'12px', color: theme.accent, cursor:'pointer', fontWeight:'500'}}>add one →</span>
+            <div style={{textAlign:'center', padding:'12px 0'}}>
+              <div style={{fontSize:'12px', color: theme.text3}}>No students yet — <span onClick={() => setPage('students')} style={{color: theme.accent, cursor:'pointer', fontWeight:'500'}}>add one</span></div>
             </div>
           ) : (
-            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'16px 18px'}}>
-              {students.map((student, i) => {
-                const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
-                const percent = Math.round(Math.min((hrs / 30) * 100, 100))
-                const color = percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : '#C9A84C'
-                return (
-                  <div key={student.id} style={{marginBottom: i < students.length - 1 ? '14px' : '0'}}>
-                    <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px'}}>
-                      <div style={{display:'flex', alignItems:'center', gap:'8px'}}>
-                        <div style={{width:'24px', height:'24px', borderRadius:'50%', background: theme.accentLight, color: theme.accentText, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'9px', fontWeight:'700', flexShrink:0}}>
-                          {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                        </div>
-                        <span style={{fontSize:'13px', fontWeight:'500', cursor:'pointer', color: theme.text}} onClick={() => setPage(`student-${student.id}`)}>{student.name.split(' ')[0]}</span>
+            students.map((student, i) => {
+              const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
+              const percent = Math.round(Math.min((hrs / 30) * 100, 100))
+              const color = percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : '#C9A84C'
+              return (
+                <div key={student.id} style={{marginBottom: i < students.length - 1 ? '12px' : '0'}}>
+                  <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'5px'}}>
+                    <div style={{display:'flex', alignItems:'center', gap:'7px'}}>
+                      <div style={{width:'22px', height:'22px', borderRadius:'50%', background:'#DFF0E8', color:'#1A5C35', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'8px', fontWeight:'700', flexShrink:0}}>
+                        {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                       </div>
-                      <span style={{fontSize:'11px', color: theme.text3}}>{hrs}/30</span>
+                      <span style={{fontSize:'12.5px', fontWeight:'500', cursor:'pointer', color: theme.text}} onClick={() => setPage(`student-${student.id}`)}>{student.name.split(' ')[0]}</span>
                     </div>
-                    <div style={{height:'4px', background: theme.surface2, borderRadius:'2px', overflow:'hidden'}}>
-                      <div style={{height:'100%', width:`${percent}%`, background: color, borderRadius:'2px'}}></div>
-                    </div>
-                    {i < students.length - 1 && <div style={{height:'1px', background: theme.border, margin:'12px 0 0'}}></div>}
+                    <span style={{fontSize:'11px', color: theme.text3}}>{hrs}/30</span>
                   </div>
-                )
-              })}
-            </div>
+                  <div style={{height:'4px', background: barBg, borderRadius:'2px', overflow:'hidden'}}>
+                    <div style={{height:'100%', width:`${percent}%`, background: color, borderRadius:'2px'}}></div>
+                  </div>
+                  {i < students.length - 1 && <div style={{height:'1px', background: cardBorder, margin:'10px 0 0'}}></div>}
+                </div>
+              )
+            })
           )}
-        </div>
+        </Widget>
 
-        {/* Column 2 — Upcoming */}
-        <div>
-          <div style={{fontSize:'13px', fontWeight:'600', color: theme.text, marginBottom:'12px'}}>Upcoming sessions</div>
-          {upcoming.length === 0 ? (
-            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'24px', textAlign:'center'}}>
-              <div style={{fontSize:'12px', color: theme.text3}}>No upcoming sessions</div>
-              <span onClick={onNewSession} style={{fontSize:'12px', color: theme.accent, cursor:'pointer', fontWeight:'500', display:'block', marginTop:'4px'}}>schedule one →</span>
-            </div>
-          ) : (
-            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', overflow:'hidden'}}>
-              {upcoming.map((s, i) => (
-                <div key={s.id} style={{display:'flex', alignItems:'center', gap:'10px', padding:'12px 14px', borderBottom: i < upcoming.length - 1 ? `1px solid ${theme.border}` : 'none'}}>
-                  <div style={{width:'3px', height:'36px', borderRadius:'2px', background: theme.gold, flexShrink:0}}></div>
-                  <div style={{flex:1}}>
-                    <div style={{fontSize:'13px', fontWeight:'500', color: theme.text}}>{s.name}</div>
-                    <div style={{fontSize:'11px', color: theme.text3, marginTop:'2px'}}>{s.date} · {s.time}</div>
-                    <div style={{fontSize:'11px', color: theme.text3}}>{s.students.join(', ')}</div>
+        {/* Upcoming + This week */}
+        <div style={{display:'flex', flexDirection:'column', gap:'14px'}}>
+          <Widget title="Upcoming sessions">
+            {upcoming.length === 0 ? (
+              <div style={{textAlign:'center', padding:'8px 0'}}>
+                <div style={{fontSize:'12px', color: theme.text3}}>No upcoming sessions</div>
+                <span onClick={onNewSession} style={{fontSize:'12px', color: theme.accent, cursor:'pointer', fontWeight:'500'}}>schedule one →</span>
+              </div>
+            ) : (
+              upcoming.map((s, i) => (
+                <div key={s.id} style={{display:'flex', alignItems:'center', gap:'9px', paddingBottom: i < upcoming.length - 1 ? '10px' : '0', marginBottom: i < upcoming.length - 1 ? '10px' : '0', borderBottom: i < upcoming.length - 1 ? `1px solid ${cardBorder}` : 'none'}}>
+                  <div style={{width:'3px', height:'32px', borderRadius:'2px', background: theme.gold, flexShrink:0}}></div>
+                  <div>
+                    <div style={{fontSize:'12.5px', fontWeight:'500', color: theme.text}}>{s.name}</div>
+                    <div style={{fontSize:'11px', color: theme.text3, marginTop:'1px'}}>{s.date} · {s.time}</div>
                   </div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </Widget>
 
-          {/* This week summary */}
-          <div style={{fontSize:'13px', fontWeight:'600', color: theme.text, margin:'16px 0 12px'}}>This week</div>
-          <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'16px 18px'}}>
-            <div style={{display:'flex', justifyContent:'space-around', marginBottom:'14px'}}>
+          <Widget title="This week">
+            <div style={{display:'flex', justifyContent:'space-around', marginBottom:'12px'}}>
               {[
                 {label:'Sessions', value: weekSessions.length},
                 {label:'Completed', value: weekComplete.length},
                 {label:'Forms', value: weekForms.length},
               ].map(s => (
                 <div key={s.label} style={{textAlign:'center'}}>
-                  <div style={{fontSize:'22px', fontWeight:'700', color: theme.text, letterSpacing:'-0.5px'}}>{s.value}</div>
-                  <div style={{fontSize:'10px', color: theme.text3, textTransform:'uppercase', letterSpacing:'0.4px', marginTop:'2px'}}>{s.label}</div>
+                  <div style={{fontSize:'20px', fontWeight:'700', color: theme.text, letterSpacing:'-0.5px'}}>{s.value}</div>
+                  <div style={{fontSize:'9px', color: theme.text3, textTransform:'uppercase', letterSpacing:'0.4px', marginTop:'2px'}}>{s.label}</div>
                 </div>
               ))}
             </div>
-            <div style={{height:'1px', background: theme.border, marginBottom:'12px'}}></div>
-            <div style={{fontSize:'11.5px', color: theme.text3, fontStyle:'italic', lineHeight:'1.6', textAlign:'center'}}>"{quote}"</div>
-          </div>
+            <div style={{height:'1px', background: cardBorder, marginBottom:'10px'}}></div>
+            <div style={{fontSize:'11px', color: theme.text3, fontStyle:'italic', lineHeight:'1.6', textAlign:'center'}}>"{quote}"</div>
+          </Widget>
         </div>
 
-        {/* Column 3 — Tasks + Recent forms */}
-        <div>
-          <div style={{fontSize:'13px', fontWeight:'600', color: theme.text, marginBottom:'12px'}}>Needs attention</div>
-          {outstanding.length === 0 ? (
-            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'24px', textAlign:'center', marginBottom:'16px'}}>
-              <div style={{fontSize:'20px', marginBottom:'6px'}}>✓</div>
-              <div style={{fontSize:'12px', color: theme.text3}}>All caught up</div>
-            </div>
-          ) : (
-            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', overflow:'hidden', marginBottom:'16px'}}>
-              {outstanding.map((item, i) => (
-                <div key={i} onClick={item.action} style={{display:'flex', alignItems:'center', gap:'10px', padding:'11px 14px', borderBottom: i < outstanding.length - 1 ? `1px solid ${theme.border}` : 'none', cursor:'pointer'}}>
+        {/* Needs attention + Almost there */}
+        <div style={{display:'flex', flexDirection:'column', gap:'14px'}}>
+          <Widget title="Needs attention">
+            {outstanding.length === 0 ? (
+              <div style={{textAlign:'center', padding:'8px 0'}}>
+                <div style={{fontSize:'18px', marginBottom:'4px'}}>✓</div>
+                <div style={{fontSize:'12px', color: theme.text3}}>All caught up</div>
+              </div>
+            ) : (
+              outstanding.map((item, i) => (
+                <div key={i} onClick={item.action} style={{display:'flex', alignItems:'center', gap:'9px', paddingBottom: i < outstanding.length - 1 ? '10px' : '0', marginBottom: i < outstanding.length - 1 ? '10px' : '0', borderBottom: i < outstanding.length - 1 ? `1px solid ${cardBorder}` : 'none', cursor:'pointer'}}>
                   <div style={{width:'6px', height:'6px', borderRadius:'50%', background: item.type === 'form' ? theme.gold : item.type === 'error' ? theme.rose : theme.accent, flexShrink:0}}></div>
                   <div style={{fontSize:'12.5px', color: theme.text, flex:1}}>{item.text}</div>
                   <div style={{fontSize:'11px', color: theme.text3}}>→</div>
                 </div>
-              ))}
-            </div>
-          )}
+              ))
+            )}
+          </Widget>
 
           {studentsNearComplete.length > 0 && (
-            <>
-              <div style={{fontSize:'13px', fontWeight:'600', color: theme.text, marginBottom:'12px'}}>Almost there 🎯</div>
-              <div style={{background: theme.surface, border:`2px solid ${theme.accent}30`, borderRadius:'12px', overflow:'hidden'}}>
-                {studentsNearComplete.map((student, i) => {
-                  const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
-                  return (
-                    <div key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', gap:'10px', padding:'11px 14px', borderBottom: i < studentsNearComplete.length - 1 ? `1px solid ${theme.border}` : 'none', cursor:'pointer'}}>
-                      <div style={{width:'28px', height:'28px', borderRadius:'50%', background: theme.accentLight, color: theme.accentText, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'9px', fontWeight:'700', flexShrink:0}}>
-                        {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
-                      </div>
-                      <div style={{flex:1}}>
-                        <div style={{fontSize:'12.5px', fontWeight:'500', color: theme.text}}>{student.name.split(' ')[0]}</div>
-                        <div style={{fontSize:'11px', color: theme.accentText, fontWeight:'600'}}>{30 - hrs} hrs to go</div>
-                      </div>
+            <Widget title="Almost there 🎯">
+              {studentsNearComplete.map((student, i) => {
+                const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
+                return (
+                  <div key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', gap:'9px', paddingBottom: i < studentsNearComplete.length - 1 ? '10px' : '0', marginBottom: i < studentsNearComplete.length - 1 ? '10px' : '0', borderBottom: i < studentsNearComplete.length - 1 ? `1px solid ${cardBorder}` : 'none', cursor:'pointer'}}>
+                    <div style={{width:'26px', height:'26px', borderRadius:'50%', background:'#DFF0E8', color:'#1A5C35', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'8px', fontWeight:'700', flexShrink:0}}>
+                      {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
                     </div>
-                  )
-                })}
-              </div>
-            </>
+                    <div style={{flex:1}}>
+                      <div style={{fontSize:'12.5px', fontWeight:'500', color: theme.text}}>{student.name.split(' ')[0]}</div>
+                      <div style={{fontSize:'11px', color: theme.accentText, fontWeight:'600'}}>{30 - hrs} hrs to go</div>
+                    </div>
+                  </div>
+                )
+              })}
+            </Widget>
           )}
         </div>
       </div>
@@ -476,23 +483,28 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
             <div style={{fontSize:'13px', fontWeight:'600', color: theme.text}}>Recent forms</div>
             <button onClick={() => setPage('reports')} style={{background:'none', border:'none', fontSize:'12.5px', color: theme.accent, cursor:'pointer', fontWeight:'500'}}>View all →</button>
           </div>
-          <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', overflow:'hidden'}}>
-            {generatedForms.slice(0, 3).map((f, i) => (
-              <div key={f.id} onClick={() => setPage('reports')} style={{display:'flex', alignItems:'center', gap:'14px', padding:'12px 18px', borderBottom: i < Math.min(generatedForms.length, 3) - 1 ? `1px solid ${theme.border}` : 'none', cursor:'pointer'}}>
-                <div style={{width:'32px', height:'32px', borderRadius:'8px', background: f.status === 'signed' ? theme.accentLight : theme.roseLight, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
-                  <svg width="13" height="13" fill="none" stroke={f.status === 'signed' ? theme.accentText : theme.rose} strokeWidth="1.5" viewBox="0 0 16 16">
-                    {f.status === 'signed' ? <polyline points="3,8 6.5,11.5 13,5"/> : <><path d="M4 2h8v12H4z"/><line x1="6.5" y1="6" x2="9.5" y2="6"/><line x1="6.5" y1="9" x2="9.5" y2="9"/></>}
-                  </svg>
+          <div style={{borderRadius:'12px', overflow:'hidden', border:`1px solid ${cardBorder}`}}>
+            <div style={{background: headerBg, padding:'10px 16px'}}>
+              <div style={{fontSize:'11px', fontWeight:'700', color:'white', textTransform:'uppercase', letterSpacing:'0.6px'}}>Generated forms</div>
+            </div>
+            <div style={{background: cardBg}}>
+              {generatedForms.slice(0, 3).map((f, i) => (
+                <div key={f.id} onClick={() => setPage('reports')} style={{display:'flex', alignItems:'center', gap:'14px', padding:'12px 16px', borderBottom: i < Math.min(generatedForms.length, 3) - 1 ? `1px solid ${cardBorder}` : 'none', cursor:'pointer'}}>
+                  <div style={{width:'32px', height:'32px', borderRadius:'8px', background: f.status === 'signed' ? '#DFF0E8' : theme.roseLight, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                    <svg width="13" height="13" fill="none" stroke={f.status === 'signed' ? '#1A5C35' : theme.rose} strokeWidth="1.5" viewBox="0 0 16 16">
+                      {f.status === 'signed' ? <polyline points="3,8 6.5,11.5 13,5"/> : <><path d="M4 2h8v12H4z"/><line x1="6.5" y1="6" x2="9.5" y2="6"/><line x1="6.5" y1="9" x2="9.5" y2="9"/></>}
+                    </svg>
+                  </div>
+                  <div style={{flex:1}}>
+                    <div style={{fontSize:'13.5px', fontWeight:'500', color: theme.text}}>{f.student_name}</div>
+                    <div style={{fontSize:'11.5px', color: theme.text3, marginTop:'1px'}}>{new Date((f as any).created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</div>
+                  </div>
+                  <span style={{fontSize:'11.5px', padding:'3px 10px', borderRadius:'20px', fontWeight:'600', background: f.status === 'signed' ? '#DFF0E8' : theme.roseLight, color: f.status === 'signed' ? '#1A5C35' : theme.rose}}>
+                    {f.status === 'signed' ? 'Signed' : 'Review'}
+                  </span>
                 </div>
-                <div style={{flex:1}}>
-                  <div style={{fontSize:'13.5px', fontWeight:'500', color: theme.text}}>{f.student_name}</div>
-                  <div style={{fontSize:'11.5px', color: theme.text3, marginTop:'1px'}}>{new Date((f as any).created_at).toLocaleDateString('en-US', {month:'short', day:'numeric', year:'numeric'})}</div>
-                </div>
-                <span style={{fontSize:'11.5px', padding:'3px 10px', borderRadius:'20px', fontWeight:'600', background: f.status === 'signed' ? theme.accentLight : theme.roseLight, color: f.status === 'signed' ? theme.accentText : theme.rose}}>
-                  {f.status === 'signed' ? 'Signed' : 'Review'}
-                </span>
-              </div>
-            ))}
+              ))}
+            </div>
           </div>
         </div>
       )}
