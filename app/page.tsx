@@ -44,6 +44,7 @@ type GeneratedForm = {
 }
 
 export default function Home() {
+  const [authed, setAuthed] = useState<boolean | null>(null)
   const [page, setPage] = useState('dashboard')
   const [sessions, setSessions] = useState<Session[]>([])
   const [forms, setForms] = useState<FormTemplate[]>([])
@@ -53,21 +54,20 @@ export default function Home() {
   const [showUploadForm, setShowUploadForm] = useState(false)
   const [showNewStudent, setShowNewStudent] = useState(false)
   const [supervisor, setSupervisor] = useState<Supervisor | null>(null)
-  const [loading, setLoading] = useState(true)
   const [darkMode, setDarkMode] = useState(false)
 
   useEffect(() => { checkUser() }, [])
 
   const checkUser = async () => {
     const { data: { session } } = await supabase.auth.getSession()
-    if (!session) { window.location.href = '/auth'; return }
+    if (!session) { setAuthed(false); return }
+    setAuthed(true)
     const { data: supervisorData } = await supabase.from('supervisors').select('*').eq('id', session.user.id).single()
     setSupervisor(supervisorData)
     loadSessions(session.user.id)
     loadForms(session.user.id)
     loadStudents(session.user.id)
     loadGeneratedForms(session.user.id)
-    setLoading(false)
     setupRealtime(session.user.id)
   }
 
@@ -98,27 +98,31 @@ export default function Home() {
   const setupRealtime = (userId: string) => {
     supabase
       .channel('generated_forms_changes')
-      .on('postgres_changes',
-        { event: 'INSERT', schema: 'public', table: 'generated_forms' },
-        async () => { await loadGeneratedForms(userId) }
-      )
-      .on('postgres_changes',
-        { event: 'UPDATE', schema: 'public', table: 'sessions' },
-        async () => { await loadSessions(userId) }
-      )
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'generated_forms' }, async () => { await loadGeneratedForms(userId) })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'sessions' }, async () => { await loadSessions(userId) })
       .subscribe()
   }
 
   const handleSignOut = async () => {
     await supabase.auth.signOut()
-    window.location.href = '/auth'
+    setAuthed(false)
+  }
+
+  if (authed === null) {
+    return (
+      <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background:'#1A3C2E'}}>
+        <div style={{color:'#C8DDD4', fontSize:'14px', fontFamily:'system-ui'}}>Loading...</div>
+      </div>
+    )
+  }
+
+  if (authed === false) {
+    return <LandingPage />
   }
 
   const d = darkMode
-
   const theme = {
     sidebar: d ? '#0D1F17' : '#1A3C2E',
-    sidebarHover: d ? '#1A3C2E' : '#234D3A',
     sidebarActive: d ? '#2D5A42' : '#3D7A5A',
     sidebarText: '#C8DDD4',
     sidebarTextActive: '#FFFFFF',
@@ -140,14 +144,6 @@ export default function Home() {
     roseLight: d ? '#2A1020' : '#FCEDF3',
   }
 
-  if (loading) {
-    return (
-      <div style={{minHeight:'100vh', display:'flex', alignItems:'center', justifyContent:'center', background: theme.bg, fontFamily:'system-ui'}}>
-        <div style={{color: theme.text3, fontSize:'14px'}}>Loading...</div>
-      </div>
-    )
-  }
-
   const NavItem = ({ id, label, badge }: { id: string, label: string, badge?: number }) => (
     <button onClick={() => setPage(id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'9px 12px', borderRadius:'8px', border:'none', background: page===id ? theme.sidebarActive : 'transparent', color: page===id ? '#FFFFFF' : '#C8DDD4', fontSize:'14px', fontWeight: page===id ? '600' : '400', cursor:'pointer', marginBottom:'2px', textAlign:'left', transition:'all 0.15s', letterSpacing:'0.1px'}}>
       {label}
@@ -162,26 +158,22 @@ export default function Home() {
           <div style={{fontSize:'20px', fontWeight:'700', color:'#FFFFFF', letterSpacing:'-0.3px'}}>Supervisio</div>
           <div style={{fontSize:'11px', color: theme.sidebarText, marginTop:'3px', letterSpacing:'0.3px'}}>Clinical supervision, simplified</div>
         </div>
-
         <nav style={{flex:1, padding:'14px 10px', overflowY:'auto'}}>
           <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarText, padding:'8px 12px 6px', fontWeight:'600', opacity:0.6}}>Workspace</div>
           <NavItem id="dashboard" label="Overview" />
           <NavItem id="sessions" label="Sessions" />
           <NavItem id="reports" label="Ready to review" badge={generatedForms.filter(f => f.status === 'pending').length} />
           <NavItem id="forms" label="Form templates" />
-
           <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarText, padding:'14px 12px 6px', fontWeight:'600', opacity:0.6}}>Students</div>
           <NavItem id="students" label="All students" />
           {students.map(student => (
-            <button key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', width:'100%', padding:'7px 12px 7px 24px', borderRadius:'8px', border:'none', background: page===`student-${student.id}` ? theme.sidebarActive : 'transparent', color: page===`student-${student.id}` ? theme.sidebarTextActive : theme.sidebarText, fontSize:'12.5px', cursor:'pointer', marginBottom:'2px', textAlign:'left', opacity:0.85}}>
+            <button key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', width:'100%', padding:'7px 12px 7px 24px', borderRadius:'8px', border:'none', background: page===`student-${student.id}` ? theme.sidebarActive : 'transparent', color: page===`student-${student.id}` ? '#FFFFFF' : '#C8DDD4', fontSize:'12.5px', cursor:'pointer', marginBottom:'2px', textAlign:'left', opacity:0.85}}>
               {student.name}
             </button>
           ))}
-
           <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarText, padding:'14px 12px 6px', fontWeight:'600', opacity:0.6}}>Account</div>
           <NavItem id="settings" label="Settings" />
         </nav>
-
         <div style={{padding:'12px 10px', borderTop:`1px solid ${theme.sidebarBorder}`}}>
           <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px'}}>
             <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
@@ -193,11 +185,7 @@ export default function Home() {
                 <div style={{fontSize:'11px', color: theme.sidebarText, cursor:'pointer'}} onClick={handleSignOut}>Sign out</div>
               </div>
             </div>
-            <button
-              onClick={() => setDarkMode(!darkMode)}
-              style={{background:'transparent', border:`1px solid ${theme.sidebarBorder}`, borderRadius:'6px', padding:'5px 8px', cursor:'pointer', color: theme.sidebarText, fontSize:'14px'}}
-              title={darkMode ? 'Light mode' : 'Dark mode'}
-            >
+            <button onClick={() => setDarkMode(!darkMode)} style={{background:'transparent', border:`1px solid ${theme.sidebarBorder}`, borderRadius:'6px', padding:'5px 8px', cursor:'pointer', color: theme.sidebarText, fontSize:'14px'}} title={darkMode ? 'Light mode' : 'Dark mode'}>
               {darkMode ? '☀' : '☾'}
             </button>
           </div>
@@ -225,56 +213,163 @@ export default function Home() {
       </main>
 
       {showNewSession && (
-        <NewSessionModal
-          onClose={() => setShowNewSession(false)}
-          theme={theme}
-          onCreate={async (session) => {
-            const { data: { session: authSession } } = await supabase.auth.getSession()
-            if (!authSession) return
-            const { data } = await supabase.from('sessions').insert({
-              ...session,
-              supervisor_id: authSession.user.id,
-            }).select().single()
-            if (data) setSessions(prev => [data, ...prev])
-            setShowNewSession(false)
-            setPage('sessions')
-          }}
-        />
+        <NewSessionModal onClose={() => setShowNewSession(false)} theme={theme} onCreate={async (session) => {
+          const { data: { session: authSession } } = await supabase.auth.getSession()
+          if (!authSession) return
+          const { data } = await supabase.from('sessions').insert({ ...session, supervisor_id: authSession.user.id }).select().single()
+          if (data) setSessions(prev => [data, ...prev])
+          setShowNewSession(false)
+          setPage('sessions')
+        }} />
       )}
 
       {showUploadForm && (
-        <UploadFormModal
-          onClose={() => setShowUploadForm(false)}
-          theme={theme}
-          onUpload={async (form) => {
-            const { data: { session: authSession } } = await supabase.auth.getSession()
-            if (!authSession) return
-            const { data } = await supabase.from('form_templates').insert({
-              ...form,
-              supervisor_id: authSession.user.id,
-            }).select().single()
-            if (data) setForms(prev => [data, ...prev])
-            setShowUploadForm(false)
-          }}
-        />
+        <UploadFormModal onClose={() => setShowUploadForm(false)} theme={theme} onUpload={async (form) => {
+          const { data: { session: authSession } } = await supabase.auth.getSession()
+          if (!authSession) return
+          const { data } = await supabase.from('form_templates').insert({ ...form, supervisor_id: authSession.user.id }).select().single()
+          if (data) setForms(prev => [data, ...prev])
+          setShowUploadForm(false)
+        }} />
       )}
 
       {showNewStudent && (
-        <NewStudentModal
-          onClose={() => setShowNewStudent(false)}
-          theme={theme}
-          onCreate={async (student) => {
-            const { data: { session: authSession } } = await supabase.auth.getSession()
-            if (!authSession) return
-            const { data } = await supabase.from('students').insert({
-              ...student,
-              supervisor_id: authSession.user.id,
-            }).select().single()
-            if (data) setStudents(prev => [data, ...prev])
-            setShowNewStudent(false)
-          }}
-        />
+        <NewStudentModal onClose={() => setShowNewStudent(false)} theme={theme} onCreate={async (student) => {
+          const { data: { session: authSession } } = await supabase.auth.getSession()
+          if (!authSession) return
+          const { data } = await supabase.from('students').insert({ ...student, supervisor_id: authSession.user.id }).select().single()
+          if (data) setStudents(prev => [data, ...prev])
+          setShowNewStudent(false)
+        }} />
       )}
+    </div>
+  )
+}
+
+function LandingPage() {
+  return (
+    <div style={{fontFamily:'system-ui, sans-serif', color:'#1A1614', minHeight:'100vh'}}>
+
+      {/* Nav */}
+      <nav style={{background:'#1A3C2E', padding:'0 60px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'64px', position:'sticky', top:0, zIndex:50}}>
+        <div style={{fontSize:'20px', fontWeight:'700', color:'white', letterSpacing:'-0.3px'}}>Supervisio</div>
+        <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+          <a href="/auth" style={{color:'#C8DDD4', fontSize:'14px', textDecoration:'none', fontWeight:'500'}}>Sign in</a>
+          <a href="/auth" style={{background:'#2D7A52', color:'white', padding:'8px 20px', borderRadius:'8px', fontSize:'14px', fontWeight:'600', textDecoration:'none'}}>Get started</a>
+        </div>
+      </nav>
+
+      {/* Hero */}
+      <div style={{background:'#1A3C2E', padding:'100px 60px 110px', textAlign:'center'}}>
+        <div style={{display:'inline-block', background:'rgba(255,255,255,0.1)', color:'#A8D5BC', fontSize:'12px', fontWeight:'600', padding:'6px 16px', borderRadius:'20px', letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:'28px'}}>
+          Built for clinical supervisors
+        </div>
+        <h1 style={{fontSize:'58px', fontWeight:'800', color:'white', lineHeight:'1.1', letterSpacing:'-1.5px', margin:'0 auto 24px', maxWidth:'760px'}}>
+          Supervision paperwork,<br />
+          <span style={{color:'#6BCF94'}}>done automatically.</span>
+        </h1>
+        <p style={{fontSize:'19px', color:'#A8D5BC', lineHeight:'1.7', maxWidth:'560px', margin:'0 auto 44px'}}>
+          Upload your session recording. Supervisio transcribes it, fills in your supervision forms per student, and generates a Word doc ready to submit — in minutes.
+        </p>
+        <div style={{display:'flex', gap:'14px', justifyContent:'center', alignItems:'center'}}>
+          <a href="/auth" style={{background:'#6BCF94', color:'#1A3C2E', padding:'14px 32px', borderRadius:'10px', fontSize:'16px', fontWeight:'700', textDecoration:'none', letterSpacing:'0.1px'}}>Start for free →</a>
+          <a href="#how" style={{color:'#A8D5BC', fontSize:'15px', fontWeight:'500', textDecoration:'none'}}>See how it works ↓</a>
+        </div>
+      </div>
+
+      {/* Problem */}
+      <div style={{background:'#EDE8DF', padding:'80px 60px', textAlign:'center'}}>
+        <div style={{maxWidth:'700px', margin:'0 auto'}}>
+          <h2 style={{fontSize:'36px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'20px'}}>
+            Supervisors are drowning in paperwork
+          </h2>
+          <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.8', marginBottom:'48px'}}>
+            After every supervision session, you rewatch the recording, recall what each student discussed, and manually fill in pages of forms — for every student, every week. It takes hours. And it's why many supervisors won't take on practicum students at all.
+          </p>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'20px'}}>
+            {[
+              {stat:'2-3 hrs', desc:'spent on paperwork per session'},
+              {stat:'30 sessions', desc:'of supervision required per student'},
+              {stat:'5 pages', desc:'of forms per student per session'},
+            ].map(s => (
+              <div key={s.stat} style={{background:'white', borderRadius:'12px', padding:'28px 24px', border:'1px solid rgba(0,0,0,0.08)'}}>
+                <div style={{fontSize:'36px', fontWeight:'800', color:'#1A3C2E', letterSpacing:'-1px', marginBottom:'8px'}}>{s.stat}</div>
+                <div style={{fontSize:'14px', color:'#6B6259', lineHeight:'1.5'}}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* How it works */}
+      <div id="how" style={{background:'white', padding:'90px 60px', textAlign:'center'}}>
+        <div style={{maxWidth:'800px', margin:'0 auto'}}>
+          <div style={{fontSize:'12px', color:'#2D7A52', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>How it works</div>
+          <h2 style={{fontSize:'38px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'56px'}}>Three steps. Zero paperwork.</h2>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'32px'}}>
+            {[
+              {step:'01', title:'Upload the recording', desc:'After your session ends, download the Zoom recording and upload it to Supervisio. That\'s all you do.'},
+              {step:'02', title:'AI does the work', desc:'Supervisio transcribes the session, identifies each student, and fills in your supervision form fields automatically.'},
+              {step:'03', title:'Download and submit', desc:'Review the auto-filled form on screen, download the Word doc, make any edits, and submit to the school.'},
+            ].map(s => (
+              <div key={s.step} style={{textAlign:'left'}}>
+                <div style={{fontSize:'13px', fontWeight:'700', color:'#2D7A52', letterSpacing:'1px', marginBottom:'14px'}}>{s.step}</div>
+                <div style={{width:'48px', height:'2px', background:'#2D7A52', marginBottom:'20px', borderRadius:'2px'}}></div>
+                <h3 style={{fontSize:'20px', fontWeight:'700', color:'#1A1614', marginBottom:'12px', letterSpacing:'-0.3px'}}>{s.title}</h3>
+                <p style={{fontSize:'15px', color:'#6B6259', lineHeight:'1.7'}}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* Features */}
+      <div style={{background:'#1A3C2E', padding:'90px 60px'}}>
+        <div style={{maxWidth:'900px', margin:'0 auto'}}>
+          <div style={{textAlign:'center', marginBottom:'56px'}}>
+            <div style={{fontSize:'12px', color:'#6BCF94', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>Features</div>
+            <h2 style={{fontSize:'38px', fontWeight:'700', color:'white', letterSpacing:'-0.8px'}}>Everything you need</h2>
+          </div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px'}}>
+            {[
+              {icon:'🎙', title:'Automatic transcription', desc:'Supports Zoom, Teams, and any MP4 recording. Identifies speakers automatically.'},
+              {icon:'📋', title:'Your form, auto-filled', desc:'Upload your program\'s supervision form once. Supervisio fills in every field from the transcript.'},
+              {icon:'👥', title:'Multi-student sessions', desc:'Group supervision? Supervisio creates a separate form for each student in the same session.'},
+              {icon:'📥', title:'Word doc export', desc:'Download a completed Word document, ready to submit to the school. Make edits before sending.'},
+              {icon:'📊', title:'Student progress tracking', desc:'See each student\'s hours, sessions, and progress toward their 30-hour requirement.'},
+              {icon:'⚡', title:'Real-time updates', desc:'Forms appear automatically when processing is done. No refreshing, no waiting.'},
+            ].map(f => (
+              <div key={f.title} style={{background:'rgba(255,255,255,0.06)', borderRadius:'12px', padding:'24px 26px', border:'1px solid rgba(255,255,255,0.1)'}}>
+                <div style={{fontSize:'22px', marginBottom:'12px'}}>{f.icon}</div>
+                <div style={{fontSize:'16px', fontWeight:'600', color:'white', marginBottom:'8px'}}>{f.title}</div>
+                <div style={{fontSize:'14px', color:'#A8D5BC', lineHeight:'1.7'}}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      {/* CTA */}
+      <div style={{background:'#EDE8DF', padding:'100px 60px', textAlign:'center'}}>
+        <div style={{maxWidth:'580px', margin:'0 auto'}}>
+          <h2 style={{fontSize:'42px', fontWeight:'800', color:'#1A1614', letterSpacing:'-1px', marginBottom:'18px', lineHeight:'1.1'}}>
+            Ready to reclaim your time?
+          </h2>
+          <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.7', marginBottom:'40px'}}>
+            Join supervisors who have eliminated hours of weekly paperwork. Free to get started.
+          </p>
+          <a href="/auth" style={{display:'inline-block', background:'#1A3C2E', color:'white', padding:'16px 40px', borderRadius:'10px', fontSize:'17px', fontWeight:'700', textDecoration:'none', letterSpacing:'0.1px'}}>
+            Get started for free →
+          </a>
+          <div style={{fontSize:'13px', color:'#9B9189', marginTop:'16px'}}>No credit card required</div>
+        </div>
+      </div>
+
+      {/* Footer */}
+      <div style={{background:'#1A3C2E', padding:'32px 60px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+        <div style={{fontSize:'16px', fontWeight:'700', color:'white'}}>Supervisio</div>
+        <div style={{fontSize:'13px', color:'#6B9B82'}}>Built for clinical supervisors</div>
+      </div>
     </div>
   )
 }
@@ -299,7 +394,7 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
             {pendingForms.length > 0 ? ` · ${pendingForms.length} form${pendingForms.length > 1 ? 's' : ''} awaiting review` : ''}
           </div>
         </div>
-        <button onClick={onNewSession} style={{background: theme.accent, color:'white', border:'none', borderRadius:'9px', padding:'10px 20px', fontSize:'13.5px', fontWeight:'600', cursor:'pointer', letterSpacing:'0.2px'}}>+ New session</button>
+        <button onClick={onNewSession} style={{background: theme.accent, color:'white', border:'none', borderRadius:'9px', padding:'10px 20px', fontSize:'13.5px', fontWeight:'600', cursor:'pointer'}}>+ New session</button>
       </div>
 
       {pendingForms.length > 0 && (
@@ -332,7 +427,7 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
 
       <div style={{display:'grid', gridTemplateColumns:'1.4fr 0.6fr', gap:'22px'}}>
         <div>
-          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px', letterSpacing:'-0.1px'}}>Student progress</div>
+          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Student progress</div>
           {students.length === 0 ? (
             <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'32px', textAlign:'center'}}>
               <div style={{fontSize:'13px', color: theme.text3}}>No students yet — <span onClick={() => setPage('students')} style={{color: theme.accent, cursor:'pointer', fontWeight:'500'}}>add your first student</span></div>
@@ -355,7 +450,7 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
                       <span style={{fontSize:'12px', color: theme.text2, fontWeight:'500'}}>{hours} / 30 hrs</span>
                     </div>
                     <div style={{height:'6px', background: theme.surface2, borderRadius:'3px', overflow:'hidden'}}>
-                      <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : '#C9A84C', borderRadius:'3px', transition:'width 0.6s ease'}}></div>
+                      <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : '#C9A84C', borderRadius:'3px'}}></div>
                     </div>
                     <div style={{fontSize:'11.5px', color: theme.text3, marginTop:'4px'}}>{student.program}</div>
                     {i < students.length - 1 && <div style={{height:'1px', background: theme.border, margin:'18px 0 0'}}></div>}
@@ -365,9 +460,8 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
             </div>
           )}
         </div>
-
         <div>
-          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px', letterSpacing:'-0.1px'}}>Upcoming</div>
+          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Upcoming</div>
           {upcoming.length === 0 ? (
             <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'32px', textAlign:'center'}}>
               <div style={{fontSize:'13px', color: theme.text3}}>No upcoming sessions</div>
@@ -405,16 +499,13 @@ function Sessions({ sessions, setSessions, forms, onNewSession, theme }: { sessi
     if (!recordingUrl && !selectedFile) { alert('Please enter a recording URL or select a file'); return }
     if (!selectedTemplateId && forms.length > 0) { alert('Please select a form template'); setProcessing(null); return }
     setProcessing(sessionId)
-
     try {
       const formData = new FormData()
       formData.append('sessionId', sessionId)
       formData.append('templateId', selectedTemplateId)
       if (selectedFile) { formData.append('file', selectedFile) } else { formData.append('recordingUrl', recordingUrl) }
-
       const response = await fetch('/api/process-recording', { method: 'POST', body: formData })
       const data = await response.json()
-
       if (data.success) {
         setSessions(sessions.map(s => s.id === sessionId ? { ...s, status: 'processing' } : s))
         setUploadingFor(null)
@@ -422,11 +513,8 @@ function Sessions({ sessions, setSessions, forms, onNewSession, theme }: { sessi
         setSelectedFile(null)
         setSelectedTemplateId('')
         alert('Recording submitted! Your forms will be ready within 15-20 minutes.')
-      } else {
-        alert('Submission failed: ' + (data.error || 'Unknown error'))
-      }
+      } else { alert('Submission failed: ' + (data.error || 'Unknown error')) }
     } catch { alert('Submission failed. Please try again.') }
-
     setProcessing(null)
   }
 
@@ -439,11 +527,7 @@ function Sessions({ sessions, setSessions, forms, onNewSession, theme }: { sessi
   }
 
   const indicatorColor: Record<string, string> = {
-    scheduled: theme.gold,
-    processing: theme.accent,
-    complete: '#2D7A52',
-    live: '#5A9E7A',
-    failed: theme.rose,
+    scheduled: theme.gold, processing: theme.accent, complete: '#2D7A52', live: '#5A9E7A', failed: theme.rose,
   }
 
   return (
@@ -531,11 +615,7 @@ function Reports({ generatedForms, sessions, setGeneratedForms, theme }: { gener
     setDownloading(true)
     try {
       const sessionName = sessions.find(s => s.id === form.session_id)?.name || 'Session'
-      const response = await fetch('/api/export-form', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ studentName: form.student_name, sessionName, formData: form.form_data }),
-      })
+      const response = await fetch('/api/export-form', { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ studentName: form.student_name, sessionName, formData: form.form_data }) })
       if (!response.ok) throw new Error('Export failed')
       const blob = await response.blob()
       const url = URL.createObjectURL(blob)
@@ -553,23 +633,19 @@ function Reports({ generatedForms, sessions, setGeneratedForms, theme }: { gener
   if (selectedForm) {
     return (
       <div>
-        <button onClick={() => setSelectedForm(null)} style={{background:'none', border:'none', cursor:'pointer', color: theme.text2, fontSize:'13.5px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'6px', padding:0}}>
-          ← Back to forms
-        </button>
+        <button onClick={() => setSelectedForm(null)} style={{background:'none', border:'none', cursor:'pointer', color: theme.text2, fontSize:'13.5px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'6px', padding:0}}>← Back to forms</button>
         <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'24px'}}>
           <div>
             <div style={{fontSize:'12px', color: theme.text3, marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>{getSessionName(selectedForm.session_id)}</div>
             <div style={{fontSize:'26px', fontWeight:'700', color: theme.text, letterSpacing:'-0.5px'}}>{selectedForm.student_name}</div>
-            <div style={{fontSize:'13.5px', color: theme.text2, marginTop:'3px'}}>Auto-filled supervision form — review, download or sign off</div>
+            <div style={{fontSize:'13.5px', color: theme.text2, marginTop:'3px'}}>Auto-filled supervision form</div>
           </div>
           <div style={{display:'flex', gap:'10px'}}>
             <button onClick={() => handleDownload(selectedForm)} disabled={downloading} style={{background: theme.surface, color: theme.accent, border:`1.5px solid ${theme.accent}`, borderRadius:'9px', padding:'10px 18px', fontSize:'13.5px', fontWeight:'600', cursor:'pointer', opacity: downloading ? 0.7 : 1}}>
               {downloading ? 'Preparing...' : '↓ Download Word doc'}
             </button>
             {selectedForm.status === 'pending' && (
-              <button onClick={() => handleSign(selectedForm.id)} style={{background: theme.accent, color:'white', border:'none', borderRadius:'9px', padding:'10px 18px', fontSize:'13.5px', fontWeight:'600', cursor:'pointer'}}>
-                ✓ Mark as reviewed
-              </button>
+              <button onClick={() => handleSign(selectedForm.id)} style={{background: theme.accent, color:'white', border:'none', borderRadius:'9px', padding:'10px 18px', fontSize:'13.5px', fontWeight:'600', cursor:'pointer'}}>✓ Mark as reviewed</button>
             )}
           </div>
         </div>
@@ -590,7 +666,6 @@ function Reports({ generatedForms, sessions, setGeneratedForms, theme }: { gener
       <div style={{fontSize:'12px', color: theme.text3, marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>Documents</div>
       <div style={{fontSize:'28px', fontWeight:'700', color: theme.text, marginBottom:'6px', letterSpacing:'-0.5px'}}>Ready to review</div>
       <div style={{fontSize:'13.5px', color: theme.text2, marginBottom:'24px'}}>Auto-filled forms — review on screen or download as a Word document</div>
-
       {pending.length === 0 && signed.length === 0 ? (
         <EmptyState message="No forms yet" sub="Forms will appear here after session recordings are processed" theme={theme} />
       ) : (
@@ -613,7 +688,6 @@ function Reports({ generatedForms, sessions, setGeneratedForms, theme }: { gener
               ))}
             </>
           )}
-
           {signed.length > 0 && (
             <>
               <div style={{fontSize:'13px', fontWeight:'600', color: theme.text, margin:'22px 0 12px'}}>Reviewed</div>
@@ -650,9 +724,7 @@ function Forms({ forms, setForms, onUpload, theme }: { forms: FormTemplate[], se
   if (selectedForm) {
     return (
       <div>
-        <button onClick={() => setSelectedForm(null)} style={{background:'none', border:'none', cursor:'pointer', color: theme.text2, fontSize:'13.5px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'6px', padding:0}}>
-          ← Back to templates
-        </button>
+        <button onClick={() => setSelectedForm(null)} style={{background:'none', border:'none', cursor:'pointer', color: theme.text2, fontSize:'13.5px', marginBottom:'20px', display:'flex', alignItems:'center', gap:'6px', padding:0}}>← Back to templates</button>
         <div style={{marginBottom:'24px'}}>
           <div style={{fontSize:'12px', color: theme.text3, marginBottom:'4px', textTransform:'uppercase', letterSpacing:'0.6px'}}>Form template</div>
           <div style={{fontSize:'28px', fontWeight:'700', color: theme.text, letterSpacing:'-0.5px'}}>{selectedForm.name}</div>
@@ -746,9 +818,7 @@ function StudentsPage({ students, sessions, onNewStudent, setPage, theme }: { st
                     <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : theme.gold, borderRadius:'3px'}}></div>
                   </div>
                 </div>
-                <div style={{fontSize:'12px', color: theme.text3}}>
-                  {nextSession ? `Next: ${nextSession.date} · ${nextSession.time}` : 'No upcoming sessions'}
-                </div>
+                <div style={{fontSize:'12px', color: theme.text3}}>{nextSession ? `Next: ${nextSession.date} · ${nextSession.time}` : 'No upcoming sessions'}</div>
               </div>
             )
           })}
@@ -776,7 +846,6 @@ function StudentFile({ student, sessions, generatedForms, theme }: { student: St
           <div style={{fontSize:'13.5px', color: theme.text2}}>{student.program}</div>
         </div>
       </div>
-
       <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'14px', marginBottom:'26px'}}>
         {[
           {label:'Hours completed', value:`${hours}`},
@@ -790,18 +859,16 @@ function StudentFile({ student, sessions, generatedForms, theme }: { student: St
           </div>
         ))}
       </div>
-
       <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'22px 24px', marginBottom:'26px'}}>
         <div style={{display:'flex', justifyContent:'space-between', marginBottom:'10px'}}>
           <span style={{fontSize:'13.5px', fontWeight:'600', color: theme.text}}>Progress toward 30 hours</span>
           <span style={{fontSize:'13.5px', color: theme.text2, fontWeight:'500'}}>{percent}%</span>
         </div>
         <div style={{height:'8px', background: theme.surface2, borderRadius:'4px', overflow:'hidden'}}>
-          <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : theme.gold, borderRadius:'4px', transition:'width 0.6s ease'}}></div>
+          <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : theme.gold, borderRadius:'4px'}}></div>
         </div>
         <div style={{fontSize:'12.5px', color: theme.text3, marginTop:'7px'}}>{hours} of 30 hours completed · {Math.max(30 - hours, 0)} hours remaining</div>
       </div>
-
       <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Session history</div>
       {sessions.length === 0 ? (
         <EmptyState message="No sessions yet" sub="Sessions with this student will appear here" theme={theme} />
