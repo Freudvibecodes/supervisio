@@ -41,7 +41,16 @@ type GeneratedForm = {
   student_name: string
   form_data: Record<string, string>
   status: string
+  created_at: string
 }
+
+const QUOTES = [
+  "The supervisory relationship is itself a therapeutic relationship.",
+  "Good supervision creates the conditions for good therapy.",
+  "Supervision is where clinical wisdom is passed from one generation to the next.",
+  "The goal of supervision is not to make the supervisee dependent, but to foster independence.",
+  "Reflective practice is the cornerstone of clinical growth.",
+]
 
 export default function Home() {
   const [authed, setAuthed] = useState<boolean | null>(null)
@@ -116,17 +125,15 @@ export default function Home() {
     )
   }
 
-  if (authed === false) {
-    return <LandingPage />
-  }
+  if (authed === false) return <LandingPage />
 
   const d = darkMode
   const theme = {
     sidebar: d ? '#0D1F17' : '#1A3C2E',
     sidebarActive: d ? '#2D5A42' : '#3D7A5A',
-    sidebarText: '#C8DDD4',
-    sidebarTextActive: '#FFFFFF',
-    sidebarBorder: 'rgba(255,255,255,0.1)',
+    sidebarText: '#E8F5EE',
+    sidebarTextMuted: '#A8D5BC',
+    sidebarBorder: 'rgba(255,255,255,0.12)',
     bg: d ? '#0F1A14' : '#EDE8DF',
     surface: d ? '#162119' : '#FFFFFF',
     surface2: d ? '#1C2D23' : '#F0EBE1',
@@ -145,7 +152,7 @@ export default function Home() {
   }
 
   const NavItem = ({ id, label, badge }: { id: string, label: string, badge?: number }) => (
-    <button onClick={() => setPage(id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'9px 12px', borderRadius:'8px', border:'none', background: page===id ? theme.sidebarActive : 'transparent', color: page===id ? '#FFFFFF' : '#C8DDD4', fontSize:'14px', fontWeight: page===id ? '600' : '400', cursor:'pointer', marginBottom:'2px', textAlign:'left', transition:'all 0.15s', letterSpacing:'0.1px'}}>
+    <button onClick={() => setPage(id)} style={{display:'flex', alignItems:'center', width:'100%', padding:'9px 12px', borderRadius:'8px', border:'none', background: page===id ? theme.sidebarActive : 'transparent', color: page===id ? '#FFFFFF' : theme.sidebarText, fontSize:'13.5px', fontWeight: page===id ? '700' : '500', cursor:'pointer', marginBottom:'2px', textAlign:'left', transition:'all 0.15s', letterSpacing:'0.1px'}}>
       {label}
       {badge && badge > 0 ? <span style={{marginLeft:'auto', background:'#C9A84C', color:'#1C1917', fontSize:'10px', padding:'1px 7px', borderRadius:'10px', fontWeight:'700'}}>{badge}</span> : null}
     </button>
@@ -153,39 +160,58 @@ export default function Home() {
 
   return (
     <div style={{display:'flex', minHeight:'100vh', fontFamily:'system-ui, sans-serif', background: theme.bg, color: theme.text}}>
+      <style>{`
+        @media (max-width: 768px) {
+          .app-sidebar { width: 100% !important; height: 60px !important; bottom: auto !important; flex-direction: row !important; padding: 0 !important; border-right: none !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; z-index: 50 !important; }
+          .app-logo { display: none !important; }
+          .app-nav { flex-direction: row !important; padding: 0 8px !important; overflow-x: auto !important; overflow-y: hidden !important; align-items: center !important; flex: 1 !important; }
+          .app-nav-label { display: none !important; }
+          .app-footer { display: none !important; }
+          .app-main { margin-left: 0 !important; padding: 16px !important; margin-top: 60px !important; }
+          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .two-col { grid-template-columns: 1fr !important; }
+          .three-col { grid-template-columns: 1fr !important; }
+          .four-col { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
+          .form-grid { grid-template-columns: 1fr !important; }
+          .student-grid { grid-template-columns: 1fr !important; }
+        }
+      `}</style>
+
       <aside className="app-sidebar" style={{width:'240px', background: theme.sidebar, display:'flex', flexDirection:'column', flexShrink:0, position:'fixed', top:0, left:0, bottom:0}}>
         <div className="app-logo" style={{padding:'24px 20px 20px', borderBottom:`1px solid ${theme.sidebarBorder}`}}>
-          <div style={{fontSize:'20px', fontWeight:'700', color:'#FFFFFF', letterSpacing:'-0.3px'}}>Supervisio</div>
-          <div style={{fontSize:'11px', color: theme.sidebarText, marginTop:'3px', letterSpacing:'0.3px'}}>Clinical supervision, simplified</div>
+          <div style={{fontSize:'20px', fontWeight:'800', color:'#FFFFFF', letterSpacing:'-0.3px'}}>Supervisio</div>
+          <div style={{fontSize:'11px', color: theme.sidebarTextMuted, marginTop:'3px', letterSpacing:'0.3px'}}>Clinical supervision, simplified</div>
         </div>
+
         <nav className="app-nav" style={{flex:1, padding:'14px 10px', overflowY:'auto'}}>
-          <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarText, padding:'8px 12px 6px', fontWeight:'600', opacity:0.6}}>Workspace</div>
+          <div className="app-nav-label" style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarTextMuted, padding:'8px 12px 6px', fontWeight:'700'}}>Workspace</div>
           <NavItem id="dashboard" label="Overview" />
           <NavItem id="sessions" label="Sessions" />
           <NavItem id="reports" label="Ready to review" badge={generatedForms.filter(f => f.status === 'pending').length} />
           <NavItem id="forms" label="Form templates" />
-          <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarText, padding:'14px 12px 6px', fontWeight:'600', opacity:0.6}}>Students</div>
+          <div className="app-nav-label" style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarTextMuted, padding:'14px 12px 6px', fontWeight:'700'}}>Students</div>
           <NavItem id="students" label="All students" />
           {students.map(student => (
-            <button key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', width:'100%', padding:'7px 12px 7px 24px', borderRadius:'8px', border:'none', background: page===`student-${student.id}` ? theme.sidebarActive : 'transparent', color: page===`student-${student.id}` ? '#FFFFFF' : '#C8DDD4', fontSize:'12.5px', cursor:'pointer', marginBottom:'2px', textAlign:'left', opacity:0.85}}>
+            <button key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{display:'flex', alignItems:'center', width:'100%', padding:'7px 12px 7px 24px', borderRadius:'8px', border:'none', background: page===`student-${student.id}` ? theme.sidebarActive : 'transparent', color: page===`student-${student.id}` ? '#FFFFFF' : theme.sidebarText, fontSize:'13px', fontWeight:'500', cursor:'pointer', marginBottom:'2px', textAlign:'left'}}>
               {student.name}
             </button>
           ))}
-          <div style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarText, padding:'14px 12px 6px', fontWeight:'600', opacity:0.6}}>Account</div>
+          <div className="app-nav-label" style={{fontSize:'10px', textTransform:'uppercase', letterSpacing:'1px', color: theme.sidebarTextMuted, padding:'14px 12px 6px', fontWeight:'700'}}>Account</div>
           <NavItem id="settings" label="Settings" />
         </nav>
+
         <div className="app-footer" style={{padding:'12px 10px', borderTop:`1px solid ${theme.sidebarBorder}`}}>
           <div style={{display:'flex', alignItems:'center', justifyContent:'space-between', padding:'8px 12px'}}>
             <div style={{display:'flex', alignItems:'center', gap:'10px'}}>
-              <div style={{width:'32px', height:'32px', borderRadius:'50%', background: theme.sidebarActive, color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:'600'}}>
+              <div style={{width:'32px', height:'32px', borderRadius:'50%', background: theme.sidebarActive, color:'white', display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:'700'}}>
                 {supervisor?.full_name?.split(' ').map((n: string) => n[0]).join('').toUpperCase() || 'S'}
               </div>
               <div>
-                <div style={{fontSize:'13px', fontWeight:'500', color:'white'}}>{supervisor?.full_name || 'Supervisor'}</div>
-                <div style={{fontSize:'11px', color: theme.sidebarText, cursor:'pointer'}} onClick={handleSignOut}>Sign out</div>
+                <div style={{fontSize:'13px', fontWeight:'600', color:'white'}}>{supervisor?.full_name || 'Supervisor'}</div>
+                <div style={{fontSize:'11px', color: theme.sidebarTextMuted, cursor:'pointer'}} onClick={handleSignOut}>Sign out</div>
               </div>
             </div>
-            <button onClick={() => setDarkMode(!darkMode)} style={{background:'transparent', border:`1px solid ${theme.sidebarBorder}`, borderRadius:'6px', padding:'5px 8px', cursor:'pointer', color: theme.sidebarText, fontSize:'14px'}} title={darkMode ? 'Light mode' : 'Dark mode'}>
+            <button onClick={() => setDarkMode(!darkMode)} style={{background:'transparent', border:`1px solid ${theme.sidebarBorder}`, borderRadius:'6px', padding:'5px 8px', cursor:'pointer', color: theme.sidebarText, fontSize:'14px'}}>
               {darkMode ? '☀' : '☾'}
             </button>
           </div>
@@ -246,164 +272,40 @@ export default function Home() {
   )
 }
 
-function LandingPage() {
-  return (
-    <div style={{fontFamily:'system-ui, sans-serif', color:'#1A1614', minHeight:'100vh'}}>
-      <style>{`
-        @media (max-width: 768px) {
-          .l-nav { padding: 0 20px !important; }
-          .l-hero { padding: 60px 24px 70px !important; }
-          .l-hero-h1 { font-size: 32px !important; letter-spacing: -0.5px !important; }
-          .l-hero-p { font-size: 15px !important; }
-          .l-hero-btns { flex-direction: column !important; align-items: stretch !important; text-align: center !important; }
-          .l-section { padding: 56px 24px !important; }
-          .l-h2 { font-size: 26px !important; letter-spacing: -0.3px !important; }
-          .l-grid-3 { grid-template-columns: 1fr !important; }
-          .l-grid-2 { grid-template-columns: 1fr !important; }
-          .l-steps { grid-template-columns: 1fr !important; gap: 36px !important; }
-          .l-footer { padding: 24px 20px !important; flex-direction: column !important; gap: 8px !important; text-align: center !important; }
-          .l-cta-h2 { font-size: 28px !important; }
-          .app-sidebar { width: 100% !important; height: 60px !important; bottom: auto !important; flex-direction: row !important; padding: 0 !important; border-right: none !important; border-bottom: 1px solid rgba(255,255,255,0.1) !important; z-index: 50 !important; }
-          .app-logo { display: none !important; }
-          .app-nav { flex-direction: row !important; padding: 0 8px !important; overflow-x: auto !important; overflow-y: hidden !important; align-items: center !important; flex: 1 !important; }
-          .app-nav-label { display: none !important; }
-          .app-nav-btn { padding: 8px 10px !important; font-size: 12px !important; margin-bottom: 0 !important; white-space: nowrap !important; }
-          .app-footer { display: none !important; }
-          .app-main { margin-left: 0 !important; padding: 16px !important; margin-top: 60px !important; }
-          .stats-grid { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
-          .two-col { grid-template-columns: 1fr !important; }
-          .three-col { grid-template-columns: 1fr !important; }
-          .four-col { grid-template-columns: repeat(2, 1fr) !important; gap: 10px !important; }
-          .form-grid { grid-template-columns: 1fr !important; }
-          .student-grid { grid-template-columns: 1fr !important; }
-        }
-      `}</style>
-
-      <nav className="l-nav" style={{background:'#1A3C2E', padding:'0 60px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'64px', position:'sticky', top:0, zIndex:50}}>
-        <div style={{fontSize:'20px', fontWeight:'700', color:'white', letterSpacing:'-0.3px'}}>Supervisio</div>
-        <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
-          <a href="/auth" style={{color:'#C8DDD4', fontSize:'14px', textDecoration:'none', fontWeight:'500'}}>Sign in</a>
-          <a href="/auth" style={{background:'#2D7A52', color:'white', padding:'8px 20px', borderRadius:'8px', fontSize:'14px', fontWeight:'600', textDecoration:'none'}}>Get started</a>
-        </div>
-      </nav>
-
-      <div className="l-hero" style={{background:'#1A3C2E', padding:'100px 60px 110px', textAlign:'center'}}>
-        <div style={{display:'inline-block', background:'rgba(255,255,255,0.1)', color:'#A8D5BC', fontSize:'12px', fontWeight:'600', padding:'6px 16px', borderRadius:'20px', letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:'28px'}}>
-          Built for clinical supervisors
-        </div>
-        <h1 className="l-hero-h1" style={{fontSize:'56px', fontWeight:'800', color:'white', lineHeight:'1.1', letterSpacing:'-1.5px', margin:'0 auto 24px', maxWidth:'760px'}}>
-          Supervision paperwork,<br />
-          <span style={{color:'#6BCF94'}}>done automatically.</span>
-        </h1>
-        <p className="l-hero-p" style={{fontSize:'19px', color:'#A8D5BC', lineHeight:'1.7', maxWidth:'560px', margin:'0 auto 44px'}}>
-          Upload your session recording. Supervisio transcribes it, fills in your supervision forms per student, and generates a Word document ready to submit — automatically.
-        </p>
-        <div className="l-hero-btns" style={{display:'flex', gap:'14px', justifyContent:'center', alignItems:'center'}}>
-          <a href="/auth" style={{background:'#6BCF94', color:'#1A3C2E', padding:'14px 32px', borderRadius:'10px', fontSize:'16px', fontWeight:'700', textDecoration:'none'}}>Start for free →</a>
-          <a href="#how" style={{color:'#A8D5BC', fontSize:'15px', fontWeight:'500', textDecoration:'none'}}>See how it works ↓</a>
-        </div>
-      </div>
-
-      <div className="l-section" style={{background:'#EDE8DF', padding:'80px 60px', textAlign:'center'}}>
-        <div style={{maxWidth:'680px', margin:'0 auto'}}>
-          <h2 className="l-h2" style={{fontSize:'34px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'20px'}}>
-            Designed to reduce administrative burden
-          </h2>
-          <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.8', marginBottom:'48px'}}>
-            Clinical supervision involves meaningful documentation requirements. Supervisio handles the time-consuming parts — transcription, organization, and form completion — so supervisors can focus on what matters most: the supervisory relationship.
-          </p>
-          <div className="l-grid-3" style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'20px'}}>
-            {[
-              {icon:'🎙', label:'Automatic transcription', desc:'Session recordings are transcribed with speaker identification'},
-              {icon:'📋', label:'Form auto-completion', desc:'Supervision form fields are filled based on session content'},
-              {icon:'📥', label:'Document export', desc:'Download a completed Word document ready for submission'},
-            ].map(s => (
-              <div key={s.label} style={{background:'white', borderRadius:'12px', padding:'28px 24px', border:'1px solid rgba(0,0,0,0.08)', textAlign:'left'}}>
-                <div style={{fontSize:'24px', marginBottom:'12px'}}>{s.icon}</div>
-                <div style={{fontSize:'15px', fontWeight:'600', color:'#1A1614', marginBottom:'8px'}}>{s.label}</div>
-                <div style={{fontSize:'13.5px', color:'#6B6259', lineHeight:'1.6'}}>{s.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div id="how" className="l-section" style={{background:'white', padding:'90px 60px', textAlign:'center'}}>
-        <div style={{maxWidth:'800px', margin:'0 auto'}}>
-          <div style={{fontSize:'12px', color:'#2D7A52', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>How it works</div>
-          <h2 className="l-h2" style={{fontSize:'36px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'56px'}}>Simple from start to finish</h2>
-          <div className="l-steps" style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'32px'}}>
-            {[
-              {step:'01', title:'Upload your form', desc:"Start by uploading your program's supervision form. Supervisio reads the fields and learns what information to capture."},
-              {step:'02', title:'Add a session recording', desc:'After each supervision session, upload the recording. Supervisio transcribes it and identifies each participant.'},
-              {step:'03', title:'Review and download', desc:'A completed form is generated per student. Review it on screen, download the Word document, and submit.'},
-            ].map(s => (
-              <div key={s.step} style={{textAlign:'left'}}>
-                <div style={{fontSize:'13px', fontWeight:'700', color:'#2D7A52', letterSpacing:'1px', marginBottom:'14px'}}>{s.step}</div>
-                <div style={{width:'40px', height:'2px', background:'#2D7A52', marginBottom:'20px', borderRadius:'2px'}}></div>
-                <h3 style={{fontSize:'19px', fontWeight:'700', color:'#1A1614', marginBottom:'12px', letterSpacing:'-0.2px'}}>{s.title}</h3>
-                <p style={{fontSize:'14.5px', color:'#6B6259', lineHeight:'1.75'}}>{s.desc}</p>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="l-section" style={{background:'#1A3C2E', padding:'90px 60px'}}>
-        <div style={{maxWidth:'900px', margin:'0 auto'}}>
-          <div style={{textAlign:'center', marginBottom:'56px'}}>
-            <div style={{fontSize:'12px', color:'#6BCF94', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>Capabilities</div>
-            <h2 className="l-h2" style={{fontSize:'36px', fontWeight:'700', color:'white', letterSpacing:'-0.8px'}}>Built for clinical practice</h2>
-          </div>
-          <div className="l-grid-2" style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px'}}>
-            {[
-              {icon:'🎙', title:'Session transcription', desc:'Supports Zoom, Teams, and standard audio/video formats. Speaker identification included.'},
-              {icon:'📋', title:'Custom form support', desc:"Upload your program's specific supervision form. Fields are detected and filled accordingly."},
-              {icon:'👥', title:'Group supervision', desc:'Multiple students in one session are handled individually. A separate form is generated for each.'},
-              {icon:'📥', title:'Word document export', desc:'Download a completed document formatted for submission. Editable before sending.'},
-              {icon:'📊', title:'Student progress', desc:'Track supervision hours and session history for each student in one place.'},
-              {icon:'⚡', title:'Automatic updates', desc:'Forms appear as soon as processing is complete. No manual refresh required.'},
-            ].map(f => (
-              <div key={f.title} style={{background:'rgba(255,255,255,0.06)', borderRadius:'12px', padding:'24px 26px', border:'1px solid rgba(255,255,255,0.1)'}}>
-                <div style={{fontSize:'20px', marginBottom:'12px'}}>{f.icon}</div>
-                <div style={{fontSize:'15px', fontWeight:'600', color:'white', marginBottom:'8px'}}>{f.title}</div>
-                <div style={{fontSize:'14px', color:'#A8D5BC', lineHeight:'1.7'}}>{f.desc}</div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </div>
-
-      <div className="l-section" style={{background:'#EDE8DF', padding:'100px 60px', textAlign:'center'}}>
-        <div style={{maxWidth:'540px', margin:'0 auto'}}>
-          <h2 className="l-cta-h2" style={{fontSize:'38px', fontWeight:'800', color:'#1A1614', letterSpacing:'-1px', marginBottom:'18px', lineHeight:'1.15'}}>
-            Ready to get started?
-          </h2>
-          <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.7', marginBottom:'40px'}}>
-            Supervisio is free to start. No credit card required.
-          </p>
-          <a href="/auth" style={{display:'inline-block', background:'#1A3C2E', color:'white', padding:'16px 40px', borderRadius:'10px', fontSize:'17px', fontWeight:'700', textDecoration:'none'}}>
-            Create your account →
-          </a>
-        </div>
-      </div>
-
-      <div className="l-footer" style={{background:'#1A3C2E', padding:'32px 60px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
-        <div style={{fontSize:'16px', fontWeight:'700', color:'white'}}>Supervisio</div>
-        <div style={{fontSize:'13px', color:'#6B9B82'}}>Clinical supervision documentation, simplified</div>
-      </div>
-    </div>
-  )
-}
-
 function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, supervisor, theme }: { sessions: Session[], students: Student[], generatedForms: GeneratedForm[], setPage: (p: string) => void, onNewSession: () => void, supervisor: Supervisor | null, theme: Record<string, string> }) {
   const firstName = supervisor?.full_name?.split(' ')[0] || 'there'
   const upcoming = sessions.filter(s => s.status === 'scheduled').slice(0, 3)
   const pendingForms = generatedForms.filter(f => f.status === 'pending')
+  const recentForms = generatedForms.slice(0, 3)
+  const processing = sessions.filter(s => s.status === 'processing')
   const today = new Date().toISOString().split('T')[0]
   const todaySessions = sessions.filter(s => s.date === today)
   const hour = new Date().getHours()
   const greeting = hour < 12 ? 'Good morning' : hour < 17 ? 'Good afternoon' : 'Good evening'
+  const quote = QUOTES[new Date().getDay() % QUOTES.length]
+
+  const now = new Date()
+  const weekStart = new Date(now)
+  weekStart.setDate(now.getDate() - now.getDay())
+  const weekSessions = sessions.filter(s => new Date(s.date) >= weekStart)
+  const weekComplete = weekSessions.filter(s => s.status === 'complete')
+  const weekForms = generatedForms.filter(f => new Date((f as any).created_at) >= weekStart)
+
+  const studentsNearComplete = students.filter(student => {
+    const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
+    return hrs >= 24 && hrs < 30
+  })
+
+  const studentsNoRecentSession = students.filter(student => {
+    const studentSessions = sessions.filter(s => s.students.includes(student.name) && s.status === 'scheduled')
+    return studentSessions.length === 0
+  })
+
+  const outstanding = [
+    ...pendingForms.map(f => ({ type: 'form', text: `Review form — ${f.student_name}`, action: () => setPage('reports') })),
+    ...sessions.filter(s => s.status === 'failed').map(s => ({ type: 'error', text: `Recording failed — ${s.name}`, action: () => setPage('sessions') })),
+    ...studentsNoRecentSession.slice(0, 2).map(s => ({ type: 'student', text: `No upcoming session — ${s.name}`, action: () => setPage('students') })),
+  ].slice(0, 5)
 
   return (
     <div>
@@ -420,20 +322,20 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
       </div>
 
       {pendingForms.length > 0 && (
-        <div onClick={() => setPage('reports')} style={{background: theme.goldLight, border:`1px solid ${theme.gold}40`, borderLeft:`4px solid ${theme.gold}`, borderRadius:'10px', padding:'13px 16px', marginBottom:'22px', fontSize:'13.5px', color: theme.gold, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontWeight:'500'}}>
+        <div onClick={() => setPage('reports')} style={{background: theme.goldLight, border:`1px solid ${theme.gold}40`, borderLeft:`4px solid ${theme.gold}`, borderRadius:'10px', padding:'13px 16px', marginBottom:'16px', fontSize:'13.5px', color: theme.gold, cursor:'pointer', display:'flex', alignItems:'center', justifyContent:'space-between', fontWeight:'500'}}>
           <span>📋 {pendingForms.length} form{pendingForms.length > 1 ? 's' : ''} ready for your review and signature</span>
           <span style={{fontSize:'16px'}}>→</span>
         </div>
       )}
 
-      {sessions.filter(s => s.status === 'processing').length > 0 && (
-        <div style={{background: theme.accentLight, border:`1px solid ${theme.accent}40`, borderLeft:`4px solid ${theme.accent}`, borderRadius:'10px', padding:'13px 16px', marginBottom:'22px', fontSize:'13px', color: theme.accentText, display:'flex', alignItems:'center', gap:'10px'}}>
+      {processing.length > 0 && (
+        <div style={{background: theme.accentLight, border:`1px solid ${theme.accent}40`, borderLeft:`4px solid ${theme.accent}`, borderRadius:'10px', padding:'13px 16px', marginBottom:'16px', fontSize:'13px', color: theme.accentText, display:'flex', alignItems:'center', gap:'10px'}}>
           <div style={{width:'8px', height:'8px', borderRadius:'50%', background: theme.accent, flexShrink:0}}></div>
-          {sessions.filter(s => s.status === 'processing').length} recording{sessions.filter(s => s.status === 'processing').length > 1 ? 's' : ''} being transcribed — forms will appear automatically when ready
+          {processing.length} recording{processing.length > 1 ? 's' : ''} being transcribed — forms will appear automatically when ready
         </div>
       )}
 
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'14px', marginBottom:'32px'}}>
+      <div className="stats-grid" style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'14px', marginBottom:'24px'}}>
         {[
           {label:'Total students', value: students.length.toString()},
           {label:'Total sessions', value: sessions.length.toString()},
@@ -447,7 +349,7 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
         ))}
       </div>
 
-      <div style={{display:'grid', gridTemplateColumns:'1.4fr 0.6fr', gap:'22px'}}>
+      <div className="two-col" style={{display:'grid', gridTemplateColumns:'1.4fr 0.6fr', gap:'22px', marginBottom:'22px'}}>
         <div>
           <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Student progress</div>
           {students.length === 0 ? (
@@ -457,9 +359,9 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
           ) : (
             <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'22px 24px'}}>
               {students.map((student, i) => {
-                const studentSessions = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete')
-                const hours = studentSessions.length
-                const percent = Math.round(Math.min((hours / 30) * 100, 100))
+                const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
+                const percent = Math.round(Math.min((hrs / 30) * 100, 100))
+                const color = percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : '#C9A84C'
                 return (
                   <div key={student.id} style={{marginBottom: i < students.length - 1 ? '20px' : '0'}}>
                     <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'7px'}}>
@@ -469,10 +371,10 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
                         </div>
                         <span style={{fontSize:'14px', fontWeight:'500', cursor:'pointer', color: theme.text}} onClick={() => setPage(`student-${student.id}`)}>{student.name}</span>
                       </div>
-                      <span style={{fontSize:'12px', color: theme.text2, fontWeight:'500'}}>{hours} / 30 hrs</span>
+                      <span style={{fontSize:'12px', color: theme.text2, fontWeight:'500'}}>{hrs} / 30 hrs</span>
                     </div>
                     <div style={{height:'6px', background: theme.surface2, borderRadius:'3px', overflow:'hidden'}}>
-                      <div style={{height:'100%', width:`${percent}%`, background: percent >= 80 ? '#2D7A52' : percent >= 50 ? '#5A9E7A' : '#C9A84C', borderRadius:'3px'}}></div>
+                      <div style={{height:'100%', width:`${percent}%`, background: color, borderRadius:'3px', transition:'width 0.6s ease'}}></div>
                     </div>
                     <div style={{fontSize:'11.5px', color: theme.text3, marginTop:'4px'}}>{student.program}</div>
                     {i < students.length - 1 && <div style={{height:'1px', background: theme.border, margin:'18px 0 0'}}></div>}
@@ -482,6 +384,7 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
             </div>
           )}
         </div>
+
         <div>
           <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Upcoming</div>
           {upcoming.length === 0 ? (
@@ -500,6 +403,102 @@ function Dashboard({ sessions, students, generatedForms, setPage, onNewSession, 
           )}
         </div>
       </div>
+
+      <div className="two-col" style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'22px', marginBottom:'22px'}}>
+        <div>
+          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>This week</div>
+          <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'20px 22px'}}>
+            <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'12px', marginBottom:'16px'}}>
+              {[
+                {label:'Sessions', value: weekSessions.length.toString()},
+                {label:'Completed', value: weekComplete.length.toString()},
+                {label:'Forms', value: weekForms.length.toString()},
+              ].map(s => (
+                <div key={s.label} style={{textAlign:'center'}}>
+                  <div style={{fontSize:'22px', fontWeight:'700', color: theme.text, letterSpacing:'-0.5px'}}>{s.value}</div>
+                  <div style={{fontSize:'11px', color: theme.text3, textTransform:'uppercase', letterSpacing:'0.5px', marginTop:'3px'}}>{s.label}</div>
+                </div>
+              ))}
+            </div>
+            <div style={{height:'1px', background: theme.border, marginBottom:'14px'}}></div>
+            <div style={{fontSize:'12px', color: theme.text3, fontStyle:'italic', lineHeight:'1.6', textAlign:'center'}}>"{quote}"</div>
+          </div>
+        </div>
+
+        <div>
+          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Needs attention</div>
+          {outstanding.length === 0 ? (
+            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'32px', textAlign:'center'}}>
+              <div style={{fontSize:'22px', marginBottom:'8px'}}>✓</div>
+              <div style={{fontSize:'13px', color: theme.text3}}>All caught up</div>
+            </div>
+          ) : (
+            <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', overflow:'hidden'}}>
+              {outstanding.map((item, i) => (
+                <div key={i} onClick={item.action} style={{display:'flex', alignItems:'center', gap:'12px', padding:'12px 16px', borderBottom: i < outstanding.length - 1 ? `1px solid ${theme.border}` : 'none', cursor:'pointer'}}>
+                  <div style={{width:'6px', height:'6px', borderRadius:'50%', background: item.type === 'form' ? theme.gold : item.type === 'error' ? theme.rose : theme.accent, flexShrink:0}}></div>
+                  <div style={{fontSize:'13px', color: theme.text, flex:1}}>{item.text}</div>
+                  <div style={{fontSize:'12px', color: theme.text3}}>→</div>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+
+      {studentsNearComplete.length > 0 && (
+        <div style={{marginBottom:'22px'}}>
+          <div style={{fontSize:'14px', fontWeight:'600', color: theme.text, marginBottom:'14px'}}>Almost there 🎯</div>
+          <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
+            {studentsNearComplete.map(student => {
+              const hrs = sessions.filter(s => s.students.includes(student.name) && s.status === 'complete').length
+              return (
+                <div key={student.id} onClick={() => setPage(`student-${student.id}`)} style={{background: theme.surface, border:`2px solid ${theme.accent}40`, borderRadius:'12px', padding:'16px 18px', cursor:'pointer'}}>
+                  <div style={{display:'flex', alignItems:'center', gap:'10px', marginBottom:'10px'}}>
+                    <div style={{width:'32px', height:'32px', borderRadius:'50%', background: theme.accentLight, color: theme.accentText, display:'flex', alignItems:'center', justifyContent:'center', fontSize:'11px', fontWeight:'700'}}>
+                      {student.name.split(' ').map(n => n[0]).join('').toUpperCase()}
+                    </div>
+                    <div>
+                      <div style={{fontSize:'13.5px', fontWeight:'500', color: theme.text}}>{student.name}</div>
+                      <div style={{fontSize:'11.5px', color: theme.accentText, fontWeight:'600'}}>{30 - hrs} hours to go</div>
+                    </div>
+                  </div>
+                  <div style={{height:'5px', background: theme.surface2, borderRadius:'3px', overflow:'hidden'}}>
+                    <div style={{height:'100%', width:`${Math.round((hrs/30)*100)}%`, background: theme.accent, borderRadius:'3px'}}></div>
+                  </div>
+                </div>
+              )
+            })}
+          </div>
+        </div>
+      )}
+
+      {recentForms.length > 0 && (
+        <div>
+          <div style={{display:'flex', justifyContent:'space-between', alignItems:'center', marginBottom:'14px'}}>
+            <div style={{fontSize:'14px', fontWeight:'600', color: theme.text}}>Recent forms</div>
+            <button onClick={() => setPage('reports')} style={{background:'none', border:'none', fontSize:'13px', color: theme.accent, cursor:'pointer', fontWeight:'500'}}>View all →</button>
+          </div>
+          <div style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', overflow:'hidden'}}>
+            {recentForms.map((f, i) => (
+              <div key={f.id} onClick={() => setPage('reports')} style={{display:'flex', alignItems:'center', gap:'14px', padding:'13px 18px', borderBottom: i < recentForms.length - 1 ? `1px solid ${theme.border}` : 'none', cursor:'pointer'}}>
+                <div style={{width:'36px', height:'36px', borderRadius:'8px', background: f.status === 'signed' ? theme.accentLight : theme.roseLight, display:'flex', alignItems:'center', justifyContent:'center', flexShrink:0}}>
+                  <svg width="14" height="14" fill="none" stroke={f.status === 'signed' ? theme.accentText : theme.rose} strokeWidth="1.5" viewBox="0 0 16 16">
+                    {f.status === 'signed' ? <polyline points="3,8 6.5,11.5 13,5"/> : <><path d="M4 2h8v12H4z"/><line x1="6.5" y1="6" x2="9.5" y2="6"/><line x1="6.5" y1="9" x2="9.5" y2="9"/></>}
+                  </svg>
+                </div>
+                <div style={{flex:1}}>
+                  <div style={{fontSize:'13.5px', fontWeight:'500', color: theme.text}}>{f.student_name}</div>
+                  <div style={{fontSize:'12px', color: theme.text3, marginTop:'1px'}}>{new Date((f as any).created_at).toLocaleDateString('en-US', {month:'short', day:'numeric'})}</div>
+                </div>
+                <span style={{fontSize:'11.5px', padding:'3px 10px', borderRadius:'20px', fontWeight:'600', background: f.status === 'signed' ? theme.accentLight : theme.roseLight, color: f.status === 'signed' ? theme.accentText : theme.rose}}>
+                  {f.status === 'signed' ? 'Signed' : 'Review'}
+                </span>
+              </div>
+            ))}
+          </div>
+        </div>
+      )}
     </div>
   )
 }
@@ -779,7 +778,7 @@ function Forms({ forms, setForms, onUpload, theme }: { forms: FormTemplate[], se
       {forms.length === 0 ? (
         <EmptyState message="No form templates yet" sub="Upload your supervision form and Supervisio will learn what to fill in" action="Upload a form" onAction={onUpload} theme={theme} />
       ) : (
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
+        <div className="form-grid" style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
           {forms.map(f => (
             <div key={f.id} style={{background: theme.surface, border:`1px solid ${theme.border}`, borderRadius:'12px', padding:'20px 22px', cursor:'pointer'}} onClick={() => setSelectedForm(f)}>
               <div style={{display:'flex', justifyContent:'space-between', alignItems:'flex-start', marginBottom:'14px'}}>
@@ -813,7 +812,7 @@ function StudentsPage({ students, sessions, onNewStudent, setPage, theme }: { st
       {students.length === 0 ? (
         <EmptyState message="No students yet" sub="Add your first student to get started" action="Add student" onAction={onNewStudent} theme={theme} />
       ) : (
-        <div style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
+        <div className="student-grid" style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'14px'}}>
           {students.map(student => {
             const studentSessions = sessions.filter(s => s.students.includes(student.name))
             const completedSessions = studentSessions.filter(s => s.status === 'complete')
@@ -868,7 +867,7 @@ function StudentFile({ student, sessions, generatedForms, theme }: { student: St
           <div style={{fontSize:'13.5px', color: theme.text2}}>{student.program}</div>
         </div>
       </div>
-      <div style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'14px', marginBottom:'26px'}}>
+      <div className="four-col" style={{display:'grid', gridTemplateColumns:'repeat(4, 1fr)', gap:'14px', marginBottom:'26px'}}>
         {[
           {label:'Hours completed', value:`${hours}`},
           {label:'Hours remaining', value:`${Math.max(30 - hours, 0)}`},
@@ -966,40 +965,94 @@ function EmptyState({ message, sub, action, onAction, theme }: { message: string
 
 function NewSessionModal({ onClose, onCreate, theme }: { onClose: () => void, onCreate: (session: Omit<Session, 'id'>) => void, theme: Record<string, string> }) {
   const [name, setName] = useState('')
-  const [date, setDate] = useState('')
-  const [time, setTime] = useState('')
   const [students, setStudents] = useState('')
+  const [selectedDay, setSelectedDay] = useState('')
+  const [selectedMonth, setSelectedMonth] = useState('')
+  const [selectedYear, setSelectedYear] = useState('')
+  const [selectedHour, setSelectedHour] = useState('')
+  const [selectedMinute, setSelectedMinute] = useState('')
+  const [selectedAmPm, setSelectedAmPm] = useState('AM')
+
+  const months = ['January','February','March','April','May','June','July','August','September','October','November','December']
+  const currentYear = new Date().getFullYear()
+  const years = Array.from({length: 3}, (_, i) => currentYear + i)
+  const days = Array.from({length: 31}, (_, i) => i + 1)
+  const hours = Array.from({length: 12}, (_, i) => i + 1)
+  const minutes = ['00', '15', '30', '45']
 
   const handleCreate = () => {
-    if (!name || !date || !time) { alert('Please fill in session name, date and time'); return }
+    if (!name || !selectedDay || !selectedMonth || !selectedYear || !selectedHour || !selectedMinute) {
+      alert('Please fill in all fields including date and time')
+      return
+    }
+    const monthNum = (months.indexOf(selectedMonth) + 1).toString().padStart(2, '0')
+    const dayNum = selectedDay.padStart(2, '0')
+    const date = `${selectedYear}-${monthNum}-${dayNum}`
+    let hour = parseInt(selectedHour)
+    if (selectedAmPm === 'PM' && hour !== 12) hour += 12
+    if (selectedAmPm === 'AM' && hour === 12) hour = 0
+    const time = `${hour.toString().padStart(2, '0')}:${selectedMinute}`
     onCreate({ name, date, time, zoom_link: '', recording_url: '', transcript_id: '', form_template_id: '', students: students.split(',').map(s => s.trim()).filter(Boolean), status: 'scheduled' })
     onClose()
   }
 
+  const selectStyle = {
+    padding:'10px 13px', border:`1px solid ${theme.border2}`, borderRadius:'9px', fontSize:'14px',
+    fontFamily:'system-ui', outline:'none', color: theme.text, background: theme.surface, cursor:'pointer'
+  }
+
   return (
     <div style={{position:'fixed', inset:0, background:'rgba(0,0,0,0.5)', display:'flex', alignItems:'center', justifyContent:'center', zIndex:100}} onClick={(e) => e.target === e.currentTarget && onClose()}>
-      <div style={{background: theme.surface, borderRadius:'14px', padding:'30px 32px', width:'480px', maxWidth:'95vw', border:`1px solid ${theme.border}`}}>
+      <div style={{background: theme.surface, borderRadius:'14px', padding:'30px 32px', width:'500px', maxWidth:'95vw', border:`1px solid ${theme.border}`}}>
         <div style={{fontSize:'21px', fontWeight:'700', color: theme.text, marginBottom:'4px', letterSpacing:'-0.3px'}}>New supervision session</div>
         <div style={{fontSize:'13px', color: theme.text3, marginBottom:'26px'}}>Schedule a session and add the recording afterwards</div>
-        {[
-          {label:'Session name', value:name, setter:setName, placeholder:'e.g. Group supervision — session 1'},
-          {label:'Students (comma separated)', value:students, setter:setStudents, placeholder:'e.g. Maya Adeyemi, Jordan Bassett'},
-        ].map(field => (
-          <div key={field.label} style={{marginBottom:'16px'}}>
-            <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>{field.label}</label>
-            <input value={field.value} onChange={e => field.setter(e.target.value)} placeholder={field.placeholder} style={{width:'100%', padding:'10px 13px', border:`1px solid ${theme.border2}`, borderRadius:'9px', fontSize:'14px', fontFamily:'system-ui', outline:'none', color: theme.text, background: theme.surface, boxSizing:'border-box'}} />
-          </div>
-        ))}
-        <div style={{display:'grid', gridTemplateColumns:'1fr 1fr', gap:'12px', marginBottom:'16px'}}>
-          <div>
-            <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>Date</label>
-            <input type="date" value={date} onChange={e => setDate(e.target.value)} style={{width:'100%', padding:'10px 13px', border:`1px solid ${theme.border2}`, borderRadius:'9px', fontSize:'14px', fontFamily:'system-ui', outline:'none', color: theme.text, background: theme.surface, boxSizing:'border-box'}} />
-          </div>
-          <div>
-            <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>Time</label>
-            <input type="time" value={time} onChange={e => setTime(e.target.value)} style={{width:'100%', padding:'10px 13px', border:`1px solid ${theme.border2}`, borderRadius:'9px', fontSize:'14px', fontFamily:'system-ui', outline:'none', color: theme.text, background: theme.surface, boxSizing:'border-box'}} />
+
+        <div style={{marginBottom:'16px'}}>
+          <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>Session name</label>
+          <input value={name} onChange={e => setName(e.target.value)} placeholder="e.g. Group supervision — session 1" style={{width:'100%', padding:'10px 13px', border:`1px solid ${theme.border2}`, borderRadius:'9px', fontSize:'14px', fontFamily:'system-ui', outline:'none', color: theme.text, background: theme.surface, boxSizing:'border-box'}} />
+        </div>
+
+        <div style={{marginBottom:'16px'}}>
+          <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>Students (comma separated)</label>
+          <input value={students} onChange={e => setStudents(e.target.value)} placeholder="e.g. Maya Adeyemi, Jordan Bassett" style={{width:'100%', padding:'10px 13px', border:`1px solid ${theme.border2}`, borderRadius:'9px', fontSize:'14px', fontFamily:'system-ui', outline:'none', color: theme.text, background: theme.surface, boxSizing:'border-box'}} />
+        </div>
+
+        <div style={{marginBottom:'16px'}}>
+          <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>Date</label>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1.5fr 1fr', gap:'8px'}}>
+            <select value={selectedDay} onChange={e => setSelectedDay(e.target.value)} style={selectStyle}>
+              <option value="">Day</option>
+              {days.map(d => <option key={d} value={d.toString()}>{d}</option>)}
+            </select>
+            <select value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} style={selectStyle}>
+              <option value="">Month</option>
+              {months.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select value={selectedYear} onChange={e => setSelectedYear(e.target.value)} style={selectStyle}>
+              <option value="">Year</option>
+              {years.map(y => <option key={y} value={y.toString()}>{y}</option>)}
+            </select>
           </div>
         </div>
+
+        <div style={{marginBottom:'16px'}}>
+          <label style={{display:'block', fontSize:'11.5px', textTransform:'uppercase', letterSpacing:'0.5px', color: theme.text2, fontWeight:'700', marginBottom:'6px'}}>Time</label>
+          <div style={{display:'grid', gridTemplateColumns:'1fr 1fr 1fr', gap:'8px'}}>
+            <select value={selectedHour} onChange={e => setSelectedHour(e.target.value)} style={selectStyle}>
+              <option value="">Hour</option>
+              {hours.map(h => <option key={h} value={h.toString()}>{h}</option>)}
+            </select>
+            <select value={selectedMinute} onChange={e => setSelectedMinute(e.target.value)} style={selectStyle}>
+              <option value="">Minute</option>
+              {minutes.map(m => <option key={m} value={m}>{m}</option>)}
+            </select>
+            <select value={selectedAmPm} onChange={e => setSelectedAmPm(e.target.value)} style={selectStyle}>
+              <option value="AM">AM</option>
+              <option value="PM">PM</option>
+            </select>
+          </div>
+        </div>
+
         <div style={{display:'flex', gap:'10px', justifyContent:'flex-end', marginTop:'22px', paddingTop:'20px', borderTop:`1px solid ${theme.border}`}}>
           <button onClick={onClose} style={{background:'none', border:`1px solid ${theme.border2}`, borderRadius:'9px', padding:'10px 18px', fontSize:'13.5px', cursor:'pointer', color: theme.text2}}>Cancel</button>
           <button onClick={handleCreate} style={{background: theme.accent, color:'white', border:'none', borderRadius:'9px', padding:'10px 20px', fontSize:'13.5px', fontWeight:'600', cursor:'pointer'}}>Create session</button>
@@ -1095,6 +1148,143 @@ function UploadFormModal({ onClose, onUpload, theme }: { onClose: () => void, on
             {parsing ? 'Reading form...' : 'Save template'}
           </button>
         </div>
+      </div>
+    </div>
+  )
+}
+
+function LandingPage() {
+  return (
+    <div style={{fontFamily:'system-ui, sans-serif', color:'#1A1614', minHeight:'100vh'}}>
+      <style>{`
+        @media (max-width: 768px) {
+          .l-nav { padding: 0 20px !important; }
+          .l-hero { padding: 60px 24px 70px !important; }
+          .l-hero-h1 { font-size: 32px !important; letter-spacing: -0.5px !important; }
+          .l-hero-p { font-size: 15px !important; }
+          .l-hero-btns { flex-direction: column !important; align-items: stretch !important; text-align: center !important; }
+          .l-section { padding: 56px 24px !important; }
+          .l-h2 { font-size: 26px !important; letter-spacing: -0.3px !important; }
+          .l-grid-3 { grid-template-columns: 1fr !important; }
+          .l-grid-2 { grid-template-columns: 1fr !important; }
+          .l-steps { grid-template-columns: 1fr !important; gap: 36px !important; }
+          .l-footer { padding: 24px 20px !important; flex-direction: column !important; gap: 8px !important; text-align: center !important; }
+          .l-cta-h2 { font-size: 28px !important; }
+        }
+      `}</style>
+
+      <nav className="l-nav" style={{background:'#1A3C2E', padding:'0 60px', display:'flex', alignItems:'center', justifyContent:'space-between', height:'64px', position:'sticky', top:0, zIndex:50}}>
+        <div style={{fontSize:'20px', fontWeight:'700', color:'white', letterSpacing:'-0.3px'}}>Supervisio</div>
+        <div style={{display:'flex', alignItems:'center', gap:'16px'}}>
+          <a href="/auth" style={{color:'#C8DDD4', fontSize:'14px', textDecoration:'none', fontWeight:'500'}}>Sign in</a>
+          <a href="/auth" style={{background:'#2D7A52', color:'white', padding:'8px 20px', borderRadius:'8px', fontSize:'14px', fontWeight:'600', textDecoration:'none'}}>Get started</a>
+        </div>
+      </nav>
+
+      <div className="l-hero" style={{background:'#1A3C2E', padding:'100px 60px 110px', textAlign:'center'}}>
+        <div style={{display:'inline-block', background:'rgba(255,255,255,0.1)', color:'#A8D5BC', fontSize:'12px', fontWeight:'600', padding:'6px 16px', borderRadius:'20px', letterSpacing:'0.8px', textTransform:'uppercase', marginBottom:'28px'}}>
+          Built for clinical supervisors
+        </div>
+        <h1 className="l-hero-h1" style={{fontSize:'56px', fontWeight:'800', color:'white', lineHeight:'1.1', letterSpacing:'-1.5px', margin:'0 auto 24px', maxWidth:'760px'}}>
+          Supervision paperwork,<br />
+          <span style={{color:'#6BCF94'}}>done automatically.</span>
+        </h1>
+        <p className="l-hero-p" style={{fontSize:'19px', color:'#A8D5BC', lineHeight:'1.7', maxWidth:'560px', margin:'0 auto 44px'}}>
+          Upload your session recording. Supervisio transcribes it, fills in your supervision forms per student, and generates a Word document ready to submit — automatically.
+        </p>
+        <div className="l-hero-btns" style={{display:'flex', gap:'14px', justifyContent:'center', alignItems:'center'}}>
+          <a href="/auth" style={{background:'#6BCF94', color:'#1A3C2E', padding:'14px 32px', borderRadius:'10px', fontSize:'16px', fontWeight:'700', textDecoration:'none'}}>Start for free →</a>
+          <a href="#how" style={{color:'#A8D5BC', fontSize:'15px', fontWeight:'500', textDecoration:'none'}}>See how it works ↓</a>
+        </div>
+      </div>
+
+      <div className="l-section" style={{background:'#EDE8DF', padding:'80px 60px', textAlign:'center'}}>
+        <div style={{maxWidth:'680px', margin:'0 auto'}}>
+          <h2 className="l-h2" style={{fontSize:'34px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'20px'}}>
+            Designed to reduce administrative burden
+          </h2>
+          <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.8', marginBottom:'48px'}}>
+            Clinical supervision involves meaningful documentation requirements. Supervisio handles the time-consuming parts — transcription, organization, and form completion — so supervisors can focus on what matters most: the supervisory relationship.
+          </p>
+          <div className="l-grid-3" style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'20px'}}>
+            {[
+              {icon:'🎙', label:'Automatic transcription', desc:'Session recordings are transcribed with speaker identification'},
+              {icon:'📋', label:'Form auto-completion', desc:'Supervision form fields are filled based on session content'},
+              {icon:'📥', label:'Document export', desc:'Download a completed Word document ready for submission'},
+            ].map(s => (
+              <div key={s.label} style={{background:'white', borderRadius:'12px', padding:'28px 24px', border:'1px solid rgba(0,0,0,0.08)', textAlign:'left'}}>
+                <div style={{fontSize:'24px', marginBottom:'12px'}}>{s.icon}</div>
+                <div style={{fontSize:'15px', fontWeight:'600', color:'#1A1614', marginBottom:'8px'}}>{s.label}</div>
+                <div style={{fontSize:'13.5px', color:'#6B6259', lineHeight:'1.6'}}>{s.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div id="how" className="l-section" style={{background:'white', padding:'90px 60px', textAlign:'center'}}>
+        <div style={{maxWidth:'800px', margin:'0 auto'}}>
+          <div style={{fontSize:'12px', color:'#2D7A52', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>How it works</div>
+          <h2 className="l-h2" style={{fontSize:'36px', fontWeight:'700', color:'#1A1614', letterSpacing:'-0.8px', marginBottom:'56px'}}>Simple from start to finish</h2>
+          <div className="l-steps" style={{display:'grid', gridTemplateColumns:'repeat(3, 1fr)', gap:'32px'}}>
+            {[
+              {step:'01', title:'Upload your form', desc:"Start by uploading your program's supervision form. Supervisio reads the fields and learns what information to capture."},
+              {step:'02', title:'Add a session recording', desc:'After each supervision session, upload the recording. Supervisio transcribes it and identifies each participant.'},
+              {step:'03', title:'Review and download', desc:'A completed form is generated per student. Review it on screen, download the Word document, and submit.'},
+            ].map(s => (
+              <div key={s.step} style={{textAlign:'left'}}>
+                <div style={{fontSize:'13px', fontWeight:'700', color:'#2D7A52', letterSpacing:'1px', marginBottom:'14px'}}>{s.step}</div>
+                <div style={{width:'40px', height:'2px', background:'#2D7A52', marginBottom:'20px', borderRadius:'2px'}}></div>
+                <h3 style={{fontSize:'19px', fontWeight:'700', color:'#1A1614', marginBottom:'12px', letterSpacing:'-0.2px'}}>{s.title}</h3>
+                <p style={{fontSize:'14.5px', color:'#6B6259', lineHeight:'1.75'}}>{s.desc}</p>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="l-section" style={{background:'#1A3C2E', padding:'90px 60px'}}>
+        <div style={{maxWidth:'900px', margin:'0 auto'}}>
+          <div style={{textAlign:'center', marginBottom:'56px'}}>
+            <div style={{fontSize:'12px', color:'#6BCF94', fontWeight:'700', textTransform:'uppercase', letterSpacing:'1px', marginBottom:'16px'}}>Capabilities</div>
+            <h2 className="l-h2" style={{fontSize:'36px', fontWeight:'700', color:'white', letterSpacing:'-0.8px'}}>Built for clinical practice</h2>
+          </div>
+          <div className="l-grid-2" style={{display:'grid', gridTemplateColumns:'repeat(2, 1fr)', gap:'20px'}}>
+            {[
+              {icon:'🎙', title:'Session transcription', desc:'Supports Zoom, Teams, and standard audio/video formats. Speaker identification included.'},
+              {icon:'📋', title:'Custom form support', desc:"Upload your program's specific supervision form. Fields are detected and filled accordingly."},
+              {icon:'👥', title:'Group supervision', desc:'Multiple students in one session are handled individually. A separate form is generated for each.'},
+              {icon:'📥', title:'Word document export', desc:'Download a completed document formatted for submission. Editable before sending.'},
+              {icon:'📊', title:'Student progress', desc:'Track supervision hours and session history for each student in one place.'},
+              {icon:'⚡', title:'Automatic updates', desc:'Forms appear as soon as processing is complete. No manual refresh required.'},
+            ].map(f => (
+              <div key={f.title} style={{background:'rgba(255,255,255,0.06)', borderRadius:'12px', padding:'24px 26px', border:'1px solid rgba(255,255,255,0.1)'}}>
+                <div style={{fontSize:'20px', marginBottom:'12px'}}>{f.icon}</div>
+                <div style={{fontSize:'15px', fontWeight:'600', color:'white', marginBottom:'8px'}}>{f.title}</div>
+                <div style={{fontSize:'14px', color:'#A8D5BC', lineHeight:'1.7'}}>{f.desc}</div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </div>
+
+      <div className="l-section" style={{background:'#EDE8DF', padding:'100px 60px', textAlign:'center'}}>
+        <div style={{maxWidth:'540px', margin:'0 auto'}}>
+          <h2 className="l-cta-h2" style={{fontSize:'38px', fontWeight:'800', color:'#1A1614', letterSpacing:'-1px', marginBottom:'18px', lineHeight:'1.15'}}>
+            Ready to get started?
+          </h2>
+          <p style={{fontSize:'17px', color:'#6B6259', lineHeight:'1.7', marginBottom:'40px'}}>
+            Supervisio is free to start. No credit card required.
+          </p>
+          <a href="/auth" style={{display:'inline-block', background:'#1A3C2E', color:'white', padding:'16px 40px', borderRadius:'10px', fontSize:'17px', fontWeight:'700', textDecoration:'none'}}>
+            Create your account →
+          </a>
+        </div>
+      </div>
+
+      <div className="l-footer" style={{background:'#1A3C2E', padding:'32px 60px', display:'flex', alignItems:'center', justifyContent:'space-between'}}>
+        <div style={{fontSize:'16px', fontWeight:'700', color:'white'}}>Supervisio</div>
+        <div style={{fontSize:'13px', color:'#6B9B82'}}>Clinical supervision documentation, simplified</div>
       </div>
     </div>
   )
